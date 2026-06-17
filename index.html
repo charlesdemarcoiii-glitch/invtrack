@@ -79,6 +79,18 @@ async function sheetsAppend(sheet,row){
   return d;
 }
 
+async function sheetsAppendBatch(sheet,rows){
+  const r=await fetch(SCRIPT_URL,{
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({action:"appendBatch",sheet:sheet,rows:rows})
+  });
+  if(!r.ok)throw new Error("HTTP error: "+r.status);
+  const d=await r.json();
+  if(!d.success)throw new Error(d.error||"Batch write failed");
+  return d;
+}
+
 async function sheetsUpdate(rowNum,values){
   const r=await fetch(SCRIPT_URL,{
     method:"POST",
@@ -163,9 +175,11 @@ async function submitMultiCheckin(){
   const pool=owners.find(o=>o.id==="POOL")||owners[0];
   const now=new Date().toISOString();
   try{
-    for(const barcode of multiCodes){
-      await submitCheckin(barcode,multiDetails.name,multiDetails.type,multiDetails.expDate,pool.id);
-    }
+    // Batch all item rows in one call
+    const itemRows=multiCodes.map(barcode=>[barcode,multiDetails.name,multiDetails.type,multiDetails.expDate,pool.id,"active",now,""]);
+    const logRows=multiCodes.map(barcode=>[now,"CHECK_IN",barcode,multiDetails.name,"",pool.name,user.username]);
+    await sheetsAppendBatch("Items",itemRows);
+    await sheetsAppendBatch("Log",logRows);
     showToast(`✅ ${multiCodes.length} items checked in to ${pool.name}`);
     setState({multiMode:false,multiDetails:null,multiCodes:[],showMultiDetails:false,showMultiScan:false,showMultiConfirm:false,activeOrder:null,scanMode:null});
     await loadData();
@@ -233,43 +247,52 @@ async function submitOrderCreate(orderQR, itemBarcodes){
   }
 }
 
+let orderReceiveInProgress = false;
 async function submitOrderReceive(orderQR, toOwnerId){
-  setState({loading:true});
+  if(orderReceiveInProgress){return;}
+  orderReceiveInProgress = true;
+  setState({modal:null,loading:true});
   const now=new Date().toISOString();
   const user=S.user.username;
   const toName=S.owners.find(o=>o.id===toOwnerId)?.name||toOwnerId;
   try{
-    // Find all items in TRANSIT that belong to this order
     const orderRow=S.orders.find(o=>o.id===orderQR);
-    if(!orderRow){showToast("Order not found","err");setState({loading:false});return;}
+    if(!orderRow){showToast("Order not found","err");setState({loading:false});orderReceiveInProgress=false;return;}
     const barcodes=(orderRow.items||"").split(",").filter(b=>b.trim());
-    if(barcodes.length===0){showToast("No items found in order","err");setState({loading:false});return;}
-    // Move all items to receiver's inventory
+    if(barcodes.length===0){showToast("No items found in order","err");setState({loading:false});orderReceiveInProgress=false;return;}
+    
+    // Get all item rows at once
+    const allItems=await sheetsGet("Items!A2:H");
+    
+    // Build update requests for each barcode
     for(const barcode of barcodes){
-      const found=await findItemRow(barcode);
-      if(found){
-        const{rowNum,data}=found;
+      const idx=allItems.findIndex(r=>String(r[0])===String(barcode));
+      if(idx!==-1){
+        const rowNum=idx+2;
+        const data=allItems[idx];
         await sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"",toOwnerId,"active",data[6]||"",data[7]||""]);
       }
-      await sheetsAppend("Log",[now,"ORDER_IN",barcode,"","TRANSIT",toName,user]);
     }
-    // Update order status to received
-    const orderRowNum=S.orders.findIndex(o=>o.id===orderQR);
-    if(orderRowNum!==-1){
-      const found=await findItemRow(orderQR);
-      // Update order in Orders sheet
-      const ordersData=await sheetsGet("Orders!A2:F");
-      const oIdx=ordersData.findIndex(r=>String(r[0])===String(orderQR));
-      if(oIdx!==-1){
-        await sheetsUpdate(oIdx+2,ordersData[oIdx].map((v,i)=>i===4?"received":v));
-      }
+    
+    // Batch log all items
+    const logRows=barcodes.map(b=>[now,"ORDER_IN",b,"","TRANSIT",toName,user]);
+    await sheetsAppendBatch("Log",logRows);
+    
+    // Update order status to received in Orders sheet
+    const ordersData=await sheetsGet("Orders!A2:F");
+    const oIdx=ordersData.findIndex(r=>String(r[0])===String(orderQR));
+    if(oIdx!==-1){
+      const oRow=ordersData[oIdx];
+      await sheetsUpdate(oIdx+2,[oRow[0]||"",oRow[1]||"",oRow[2]||"",oRow[3]||"","received",oRow[5]||""]);
     }
+    
     showToast("✅ "+barcodes.length+" items received into "+toName);
-    setState({loading:false,modal:null});
     await loadData();
   }catch(e){
     showToast("Failed: "+e.message,"err");
     setState({loading:false});
+  }finally{
+    orderReceiveInProgress=false;
   }
 }
 
@@ -279,17 +302,16 @@ function handleScan(barcode){
 
   // Order item scan mode — collecting items for a new order
   if(S.showOrderItemScan){
-    if(items.find(i=>i.barcode===barcode)){
-      const item=items.find(i=>i.barcode===barcode);
-      if(item.ownerId!=="POOL"&&item.ownerId!=="Unclaimed Inventory"&&item.status!=="active"){
-        showToast("Item not in pool","warn");setState({scanning:true});return;
-      }
-      if(S.orderItems.includes(barcode)){showToast("Already added","warn");setState({scanning:true});return;}
+    const item=items.find(i=>i.barcode===barcode);
+    if(item){
+      if(item.status==="used"){showToast("Item already used","warn");setState({scanning:true});return;}
+      if(item.status==="transit"){showToast("Item already in transit","warn");setState({scanning:true});return;}
+      if(S.orderItems.includes(barcode)){showToast("Already added to order","warn");setState({scanning:true});return;}
       const newItems=[...S.orderItems,barcode];
       setState({orderItems:newItems,scanning:true});
       showToast("📦 "+newItems.length+" item"+(newItems.length>1?"s":"")+" added to order");
     } else {
-      showToast("Item not found — scan items that exist in pool","err");
+      showToast("Item not found — must be checked in first","err");
       setState({scanning:true});
     }
     return;
@@ -347,14 +369,15 @@ function handleScan(barcode){
     const order=S.orders.find(o=>o.id===barcode);
     if(order){
       if(order.status==="received"){showToast("Order already received","warn");return;}
-      if(order.status!=="transit"){showToast("Order not in transit","warn");return;}
       const barcodes=(order.items||"").split(",").filter(b=>b.trim());
+      if(barcodes.length===0){showToast("Order has no items","warn");return;}
       setState({modal:{type:"receive_order",order,barcodes,toOwnerId:S.user.role==="admin"?"":S.user.ownerId}});
       return;
     }
     const item=items.find(i=>i.barcode===barcode);
-    if(!item){showToast("Item not found","err");return;}
+    if(!item){showToast("Item not found — check in first","err");return;}
     if(item.status==="used"){showToast("Item already used","warn");return;}
+    if(item.status==="transit"){showToast("Item is in transit — receive the order instead","warn");return;}
     if(S.user.role!=="admin"&&item.ownerId===S.user.ownerId){
       showToast("Item is already in your inventory","warn");return;
     }
