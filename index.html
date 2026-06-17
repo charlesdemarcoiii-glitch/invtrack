@@ -55,7 +55,7 @@ const CFG = {
   apiKey: "AIzaSyCJVuxBvNUHCsDcraEJ0qrHahYIWTfRAXs",
   sheetId: "1enxSBlIjswSHakVHErSs49X-xBIa5D5p16evLjGdxCQ"
 };
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxoUjybustFeIsi66oOimoDg1JVS4jClbMCbHwHG1Bkml11nvSWbDafJRoC5TRmQMSE5g/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw2S-dgkuZMJ9NoSz9DaW7sp9zmdpq53JC9xoRV9aMR5VINnugcliok9lKINMyxbbkm4Q/exec";
 
 // No OAuth needed — uses Apps Script as backend
 
@@ -68,7 +68,7 @@ async function sheetsGet(range){
 }
 
 async function sheetsAppend(sheet,row){
-  const r=await fetch("https://script.google.com/macros/s/AKfycbxoUjybustFeIsi66oOimoDg1JVS4jClbMCbHwHG1Bkml11nvSWbDafJRoC5TRmQMSE5g/exec",{
+  const r=await fetch("https://script.google.com/macros/s/AKfycbw2S-dgkuZMJ9NoSz9DaW7sp9zmdpq53JC9xoRV9aMR5VINnugcliok9lKINMyxbbkm4Q/exec",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({action:"append",sheet,row})
@@ -79,7 +79,7 @@ async function sheetsAppend(sheet,row){
 }
 
 async function sheetsUpdate(rowNum,values){
-  const r=await fetch("https://script.google.com/macros/s/AKfycbxoUjybustFeIsi66oOimoDg1JVS4jClbMCbHwHG1Bkml11nvSWbDafJRoC5TRmQMSE5g/exec",{
+  const r=await fetch("https://script.google.com/macros/s/AKfycbw2S-dgkuZMJ9NoSz9DaW7sp9zmdpq53JC9xoRV9aMR5VINnugcliok9lKINMyxbbkm4Q/exec",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({action:"update",sheet:"Items",rowNum,values})
@@ -90,7 +90,7 @@ async function sheetsUpdate(rowNum,values){
 }
 
 async function findItemRow(barcode){
-  const r=await fetch("https://script.google.com/macros/s/AKfycbxoUjybustFeIsi66oOimoDg1JVS4jClbMCbHwHG1Bkml11nvSWbDafJRoC5TRmQMSE5g/exec",{
+  const r=await fetch("https://script.google.com/macros/s/AKfycbw2S-dgkuZMJ9NoSz9DaW7sp9zmdpq53JC9xoRV9aMR5VINnugcliok9lKINMyxbbkm4Q/exec",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({action:"findrow",sheet:"Items",barcode})
