@@ -821,7 +821,6 @@ function renderScanPrompt(){
   [
     ["single","1️⃣","Single Item","Scan one item","#22c55e"],
     ["multi","📦","Multiple Items","Enter details once, scan all codes","#0ea5e9"],
-    ["order","🗃","Scan Order QR","Scan order code first","#818cf8"],
   ].forEach(([mode,icon,label,sub,color])=>{
     const btn=el("button",{style:{width:"100%",padding:"14px 16px",borderRadius:"12px",border:`1px solid ${color}33`,background:`${color}18`,color,fontWeight:"700",fontSize:"15px",display:"flex",alignItems:"center",gap:"12px",marginBottom:"10px",textAlign:"left"}});
     btn.innerHTML=`<span style="font-size:26px">${icon}</span><div><div>${label}</div><div style="font-size:11px;font-weight:400;opacity:.7;margin-top:2px">${sub}</div></div>`;
@@ -829,7 +828,6 @@ function renderScanPrompt(){
       setState({showScanPrompt:false});
       if(mode==="single")setState({multiMode:false,scanning:true,scanHint:"Point camera at QR code"});
       else if(mode==="multi")setState({multiMode:true,multiCodes:[],multiDetails:null,showMultiDetails:true});
-      else setState({multiMode:false,activeOrder:null,scanMode:"order",scanning:true,scanHint:"Scan the Order QR code"});
     };
     card.appendChild(btn);
   });
