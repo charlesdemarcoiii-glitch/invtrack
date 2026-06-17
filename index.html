@@ -68,33 +68,39 @@ async function sheetsGet(range){
 }
 
 async function sheetsAppend(sheet,row){
+  const payload=JSON.stringify({action:"append",sheet:sheet,row:row});
   const r=await fetch("https://script.google.com/macros/s/AKfycbw2S-dgkuZMJ9NoSz9DaW7sp9zmdpq53JC9xoRV9aMR5VINnugcliok9lKINMyxbbkm4Q/exec",{
     method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({action:"append",sheet,row})
+    headers:{"Content-Type":"text/plain"},
+    body:payload
   });
+  if(!r.ok)throw new Error("HTTP "+r.status);
   const d=await r.json();
   if(!d.success)throw new Error(d.error||"Write failed");
   return d;
 }
 
 async function sheetsUpdate(rowNum,values){
+  const payload=JSON.stringify({action:"update",sheet:"Items",rowNum:rowNum,values:values});
   const r=await fetch("https://script.google.com/macros/s/AKfycbw2S-dgkuZMJ9NoSz9DaW7sp9zmdpq53JC9xoRV9aMR5VINnugcliok9lKINMyxbbkm4Q/exec",{
     method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({action:"update",sheet:"Items",rowNum,values})
+    headers:{"Content-Type":"text/plain"},
+    body:payload
   });
+  if(!r.ok)throw new Error("HTTP "+r.status);
   const d=await r.json();
   if(!d.success)throw new Error(d.error||"Update failed");
   return d;
 }
 
 async function findItemRow(barcode){
+  const payload=JSON.stringify({action:"findrow",sheet:"Items",barcode:String(barcode)});
   const r=await fetch("https://script.google.com/macros/s/AKfycbw2S-dgkuZMJ9NoSz9DaW7sp9zmdpq53JC9xoRV9aMR5VINnugcliok9lKINMyxbbkm4Q/exec",{
     method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({action:"findrow",sheet:"Items",barcode})
+    headers:{"Content-Type":"text/plain"},
+    body:payload
   });
+  if(!r.ok)throw new Error("HTTP "+r.status);
   const d=await r.json();
   if(!d.success||d.rowNum===-1)return null;
   return{rowNum:d.rowNum,data:d.data};
