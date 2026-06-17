@@ -640,20 +640,27 @@ function renderMultiDetails(){
   closeBtn.onclick=()=>setState({showMultiDetails:false,multiMode:false,multiCodes:[],scanMode:null});
   titleRow.appendChild(closeBtn);inner.appendChild(titleRow);
   inner.appendChild(el("p",{style:{color:"#64748b",fontSize:"13px",margin:"0 0 20px"}},"Enter details once — they'll apply to all scanned items."));
-  [["Item Name","text",v=>name=v,"e.g. Face Shield, Hard Hat"],["Equipment Type","select",v=>type=v,""],["Expiration Date","date",v=>expDate=v,""]].forEach(([label,t,setter,ph])=>{
-    const l=el("label",{class:"label"},label);
-    let inp;
-    if(t==="select"){
-      inp=el("select");
-      inp.appendChild(el("option",{value:""},"Select type…"));
-      ["Disposable","Capital Equipment"].forEach(opt=>{inp.appendChild(el("option",{value:opt},opt));});
-      inp.onchange=e=>setter(e.target.value);
-    }else{
-      inp=el("input",{type:t,placeholder:ph});
-      inp.oninput=e=>setter(e.target.value);
-    }
-    inner.appendChild(l);inner.appendChild(inp);inner.appendChild(el("div",{style:{height:"14px"}}));
-  });
+  // Item Name dropdown
+  const ln1=el("label",{class:"label"},"Item Name");
+  const sn1=el("select");
+  sn1.appendChild(el("option",{value:""},"Select item…"));
+  ["DFX","DFXM","BTFT","DTF-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT"].forEach(function(item){sn1.appendChild(el("option",{value:item},item));});
+  sn1.onchange=function(){name=this.value;};
+  inner.appendChild(ln1);inner.appendChild(sn1);inner.appendChild(el("div",{style:{height:"14px"}}));
+
+  // Equipment Type dropdown
+  const ln2=el("label",{class:"label"},"Equipment Type");
+  const sn2=el("select");
+  sn2.appendChild(el("option",{value:""},"Select type…"));
+  ["Disposable","Capital Equipment"].forEach(function(t){sn2.appendChild(el("option",{value:t},t));});
+  sn2.onchange=function(){type=this.value;};
+  inner.appendChild(ln2);inner.appendChild(sn2);inner.appendChild(el("div",{style:{height:"14px"}}));
+
+  // Expiration Date
+  const ln3=el("label",{class:"label"},"Expiration Date");
+  const in3=el("input",{type:"date"});
+  in3.oninput=function(){expDate=this.value;};
+  inner.appendChild(ln3);inner.appendChild(in3);inner.appendChild(el("div",{style:{height:"14px"}}));
   inner.appendChild(el("div",{style:{height:"8px"}}));
   const nextBtn=el("button",{class:"btn btn-green"},"Next — Scan QR Codes →");
   nextBtn.onclick=()=>{
