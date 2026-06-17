@@ -480,6 +480,37 @@ function renderApp(){
       content.appendChild(filters);
     }
     const displayItems=isAdmin?(selectedOwner?activeItems.filter(i=>i.ownerId===selectedOwner.id):activeItems):visActiveItems;
+    // Show count summary per item type for selected owner
+    if(displayItems.length>0){
+      const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT"];
+      const counts={};
+      displayItems.forEach(function(item){
+        if(itemTypes.includes(item.name)){
+          counts[item.name]=(counts[item.name]||0)+1;
+        }
+      });
+      const hasKnown=Object.keys(counts).length>0;
+      if(hasKnown){
+        const summaryCard=document.createElement("div");
+        summaryCard.style.cssText="background:#111827;border-radius:12px;border:1px solid #1e293b;padding:14px 16px;margin-bottom:16px;";
+        const summaryTitle=document.createElement("p");
+        summaryTitle.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px;";
+        summaryTitle.textContent=selectedOwner?"Count — "+selectedOwner.name:"Count — All Inventories";
+        summaryCard.appendChild(summaryTitle);
+        const grid=document.createElement("div");
+        grid.style.cssText="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;";
+        itemTypes.forEach(function(t){
+          if(counts[t]){
+            const chip=document.createElement("div");
+            chip.style.cssText="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px 10px;text-align:center;";
+            chip.innerHTML="<div style='color:#38bdf8;font-weight:700;font-size:18px'>"+counts[t]+"</div><div style='color:#64748b;font-size:11px;margin-top:2px'>"+t+"</div>";
+            grid.appendChild(chip);
+          }
+        });
+        summaryCard.appendChild(grid);
+        content.appendChild(summaryCard);
+      }
+    }
     if(displayItems.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No active items"));
     displayItems.forEach(item=>{
       const isExp=item.expDate&&new Date(item.expDate)<new Date();
@@ -865,10 +896,13 @@ function renderModal(){
     const n1=document.createElement("label");
     n1.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
     n1.textContent="Item Name";
-    const i1=document.createElement("input");
-    i1.type="text";i1.placeholder="e.g. Face Shield, Hard Hat";
-    i1.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;";
-    i1.oninput=function(){name=this.value;};
+    const i1=document.createElement("select");
+    i1.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";
+    const defOpt1=document.createElement("option");defOpt1.value="";defOpt1.textContent="Select item…";i1.appendChild(defOpt1);
+    ["DFX","DFXM","BTFT","DTF-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT"].forEach(function(item){
+      const o=document.createElement("option");o.value=item;o.textContent=item;i1.appendChild(o);
+    });
+    i1.onchange=function(){name=this.value;};
     inner.appendChild(n1);inner.appendChild(i1);
 
     // Equipment Type
