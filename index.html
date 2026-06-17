@@ -91,11 +91,11 @@ async function sheetsAppendBatch(sheet,rows){
   return d;
 }
 
-async function sheetsUpdate(rowNum,values){
+async function sheetsUpdate(rowNum,values,sheet){
   const r=await fetch(SCRIPT_URL,{
     method:"POST",
     headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify({action:"update",sheet:"Items",rowNum:rowNum,values:values})
+    body:JSON.stringify({action:"update",sheet:sheet||"Items",rowNum:rowNum,values:values})
   });
   if(!r.ok)throw new Error("HTTP error: "+r.status);
   const d=await r.json();
@@ -283,7 +283,7 @@ async function submitOrderReceive(orderQR, toOwnerId){
     const oIdx=ordersData.findIndex(r=>String(r[0])===String(orderQR));
     if(oIdx!==-1){
       const oRow=ordersData[oIdx];
-      await sheetsUpdate(oIdx+2,[oRow[0]||"",oRow[1]||"",oRow[2]||"",oRow[3]||"","received",oRow[5]||""]);
+      await sheetsUpdate(oIdx+2,[oRow[0]||"",oRow[1]||"",oRow[2]||"",oRow[3]||"","received",oRow[5]||""],"Orders");
     }
     
     showToast("✅ "+barcodes.length+" items received into "+toName);
