@@ -224,27 +224,41 @@ async function submitTransfer(item,toOwnerId){
 }
 
 async function submitOrderCreate(orderQR, itemBarcodes){
-  setState({loading:true});
   const now=new Date().toISOString();
   const user=S.user.username;
+  const poolName=S.owners.find(o=>o.id==="POOL")?.name||"Pool";
+
+  // Optimistic UI — update local state immediately
+  const newOrder={id:orderQR,count:itemBarcodes.length,createdBy:user,createdAt:now,status:"transit",items:itemBarcodes.join(",")};
+  const updatedItems=S.items.map(i=>itemBarcodes.includes(i.barcode)?{...i,status:"transit",ownerId:"TRANSIT"}:i);
+  setState({
+    loading:false,
+    showOrderSummary:false,
+    orderItems:[],
+    pendingOrderQR:null,
+    showOrderGen:false,
+    orders:[...S.orders,newOrder],
+    items:updatedItems
+  });
+  showToast("📦 Order created! "+itemBarcodes.length+" items in transit");
+
+  // Write to sheet in background
   try{
-    // 1. Save the order to Orders sheet: orderQR, itemCount, creator, timestamp, status=transit
-    await sheetsAppend("Orders",[orderQR,itemBarcodes.length,user,now,"transit",itemBarcodes.join(",")]);
-    // 2. Move all items from Pool to TRANSIT
+    sheetsAppend("Orders",[orderQR,itemBarcodes.length,user,now,"transit",itemBarcodes.join(",")]);
+    // Get all item rows at once then update
+    const allItems=await sheetsGet("Items!A2:H");
     for(const barcode of itemBarcodes){
-      const found=await findItemRow(barcode);
-      if(found){
-        const{rowNum,data}=found;
-        await sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"","TRANSIT","transit",data[6]||"",data[7]||""]);
+      const idx=allItems.findIndex(r=>String(r[0])===String(barcode));
+      if(idx!==-1){
+        const rowNum=idx+2;
+        const data=allItems[idx];
+        sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"","TRANSIT","transit",data[6]||"",data[7]||""]);
       }
-      await sheetsAppend("Log",[now,"ORDER_OUT",barcode,"",S.owners.find(o=>o.id==="POOL")?.name||"Pool","TRANSIT",user]);
     }
-    showToast("📦 Order created! "+itemBarcodes.length+" items in transit");
-    setState({loading:false,showOrderSummary:false,orderItems:[],pendingOrderQR:null,showOrderGen:false});
-    await loadData();
+    const logRows=itemBarcodes.map(b=>[now,"ORDER_OUT",b,"",poolName,"TRANSIT",user]);
+    sheetsAppendBatch("Log",logRows);
   }catch(e){
-    showToast("Failed: "+e.message,"err");
-    setState({loading:false});
+    console.error("Order create background write failed:",e);
   }
 }
 
