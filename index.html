@@ -751,11 +751,7 @@ function renderApp(){
 
   // ORDERS
   if(tab==="orders"){
-    if(isAdmin){
-      const btn=el("button",{class:"btn",style:{background:"#a855f718",border:"1px solid #a855f733",color:"#c084fc",marginBottom:"16px"}},"+ Create New Order QR");
-      btn.onclick=()=>setState({showOrderGen:true});
-      content.appendChild(btn);
-    }
+    // Order QR creation handled via the Order button in the action bar
     if(orders.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"20px"}},"No orders yet"));
     orders.forEach(order=>{
       const card=el("div",{class:"card"});
