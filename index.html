@@ -165,8 +165,12 @@ async function submitCheckin(barcode,name,type,expDate,ownerId){
   const now=new Date().toISOString();
   const ownerName=S.owners.find(o=>o.id===ownerId)?.name||ownerId;
   const orderRef=S.activeOrder?S.activeOrder.id:"";
-  await sheetsAppend("Items",[barcode,name,type,expDate,ownerId,"active",now,""]);
-  await sheetsAppend("Log",[now,"CHECK_IN",barcode,name,orderRef,ownerName,S.user.username]);
+  // Optimistic UI — update local state immediately
+  const newItem={barcode,name,type,expDate,ownerId,status:"active",addedAt:now,usedBy:""};
+  setState({items:[...S.items,newItem]});
+  // Write to sheet in background
+  sheetsAppend("Items",[barcode,name,type,expDate,ownerId,"active",now,""]);
+  sheetsAppend("Log",[now,"CHECK_IN",barcode,name,orderRef,ownerName,S.user.username]);
 }
 
 async function submitMultiCheckin(){
@@ -202,24 +206,21 @@ async function submitCheckout(item){
 }
 
 async function submitTransfer(item,toOwnerId){
-  setState({modal:null,loading:true});
   const now=new Date().toISOString();
   const fromName=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
   const toName=S.owners.find(o=>o.id===toOwnerId)?.name||toOwnerId;
-  try{
-    const found=await findItemRow(item.barcode);
+  // Optimistic UI — update local state immediately
+  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,ownerId:toOwnerId}:i);
+  setState({modal:null,loading:false,items:updatedItems});
+  showToast("🔄 "+item.name+" → "+toName);
+  // Write to sheet in background
+  findItemRow(item.barcode).then(found=>{
     if(found){
       const{rowNum,data}=found;
-      await sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"",toOwnerId,data[5]||"active",data[6]||"",data[7]||""]);
+      sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"",toOwnerId,data[5]||"active",data[6]||"",data[7]||""]);
     }
-    await sheetsAppend("Log",[now,"TRANSFER",item.barcode,item.name,fromName,toName,S.user.username]);
-    showToast("🔄 "+item.name+" → "+toName);
-    await loadData();
-  }catch(e){
-    console.error("Transfer error:",e);
-    showToast("Write failed: "+e.message,"err");
-    setState({loading:false});
-  }
+    sheetsAppend("Log",[now,"TRANSFER",item.barcode,item.name,fromName,toName,S.user.username]);
+  }).catch(e=>console.error("Transfer write failed:",e));
 }
 
 async function submitOrderCreate(orderQR, itemBarcodes){
@@ -1179,9 +1180,10 @@ function renderModal(){
       if(!name){showToast("Enter item name","warn");return;}
       if(!pool){showToast("No pool found","err");return;}
       setState({loading:true});
-      submitCheckin(modal.barcode,name,type,expDate,pool.id)
-        .then(function(){showToast("✅ "+name+" checked in");setState({modal:null});return loadData();})
-        .catch(function(){showToast("Write failed","err");setState({loading:false});});
+      setState({modal:null,loading:false});
+    showToast("✅ "+name+" → "+(pool?.name||"Pool"));
+    submitCheckin(modal.barcode,name,type,expDate,pool.id)
+        .catch(function(e){console.error("Checkin write failed:",e);});
     };
     inner.appendChild(submitBtn);
   }
@@ -1317,6 +1319,8 @@ function renderToast(){
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 loadData();render();
+// Background sync every 60 seconds
+setInterval(()=>{ if(S.user&&!S.loading) loadData(); }, 60000);
 
 // ── SERVICE WORKER ─────────────────────────────────────────────────────────────
 if('serviceWorker' in navigator){
