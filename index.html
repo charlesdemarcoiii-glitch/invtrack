@@ -774,7 +774,7 @@ function renderApp(){
       const statusBgs={"transit":"#78350f","received":"#14532d","open":"#0f172a"};
       const st=order.status||"open";
       const barcodes=(order.items||"").split(",").filter(b=>b.trim());
-      card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px;font-family:monospace">${order.id}</div><div style="color:#64748b;font-size:11px;margin-top:2px">Items: ${barcodes.length} · By: ${order.createdBy}</div></div><span class="badge" style="background:${statusBgs[st]||"#1e293b"};color:${statusColors[st]||"#64748b"}">${st.toUpperCase()}</span></div><div style="color:#64748b;font-size:11px;margin-top:6px">${order.createdAt?new Date(order.createdAt).toLocaleString():""}</div>`;
+      card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px;font-family:monospace">${order.id}</div><div style="color:#64748b;font-size:11px;margin-top:2px">Items: ${barcodes.length} · By: ${order.createdBy}</div></div><span class="badge" style="background:${statusBgs[st]||"#1e293b"};color:${statusColors[st]||"#64748b"}">${st.toUpperCase()}</span></div><div style="color:#64748b;font-size:11px;margin-top:6px">${order.createdAt?formatDate(order.createdAt):""}</div>`;
       content.appendChild(card);
     });
   }
@@ -787,7 +787,7 @@ function renderApp(){
       const colors={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1"};
       const icons={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄"};
       const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"11px 14px",marginBottom:"7px",border:"1px solid #1e293b",display:"flex",gap:"12px"}});
-      card.innerHTML=`<span style="font-size:20px">${icons[entry.action]||"📋"}</span><div style="flex:1"><div style="display:flex;justify-content:space-between"><span style="color:${colors[entry.action]||"#94a3b8"};font-weight:700;font-size:12px">${entry.action?.replace("_"," ")}</span><span style="color:#334155;font-size:11px">${entry.ts?new Date(entry.ts).toLocaleString():""}</span></div><div style="color:#f1f5f9;font-size:13px;margin-top:2px">${entry.itemName}</div><div style="display:flex;gap:10px;margin-top:3px"><span style="color:#64748b;font-size:11px;font-family:monospace">${entry.barcode}</span><span style="color:#475569;font-size:11px">by ${entry.user}</span></div>${entry.action==="TRANSFER"?`<div style="color:#818cf8;font-size:11px;margin-top:2px">${entry.from} → ${entry.to}</div>`:""}${entry.action==="CHECK_OUT"?`<div style="color:#fb923c;font-size:11px;margin-top:2px">from ${entry.from} → Used</div>`:""}${entry.action==="CHECK_IN"&&entry.from?.startsWith("ORD-")?`<div style="color:#818cf8;font-size:11px;margin-top:2px">Order: ${entry.from}</div>`:""}</div>`;
+      card.innerHTML=`<span style="font-size:20px">${icons[entry.action]||"📋"}</span><div style="flex:1"><div style="display:flex;justify-content:space-between"><span style="color:${colors[entry.action]||"#94a3b8"};font-weight:700;font-size:12px">${entry.action?.replace("_"," ")}</span><span style="color:#334155;font-size:11px">${entry.ts?formatDate(entry.ts):""}</span></div><div style="color:#f1f5f9;font-size:13px;margin-top:2px">${entry.itemName}</div><div style="display:flex;gap:10px;margin-top:3px"><span style="color:#64748b;font-size:11px;font-family:monospace">${entry.barcode}</span><span style="color:#475569;font-size:11px">by ${entry.user}</span></div>${entry.action==="TRANSFER"?`<div style="color:#818cf8;font-size:11px;margin-top:2px">${entry.from} → ${entry.to}</div>`:""}${entry.action==="CHECK_OUT"?`<div style="color:#fb923c;font-size:11px;margin-top:2px">from ${entry.from} → Used</div>`:""}${entry.action==="CHECK_IN"&&entry.from?.startsWith("ORD-")?`<div style="color:#818cf8;font-size:11px;margin-top:2px">Order: ${entry.from}</div>`:""}</div>`;
       content.appendChild(card);
     });
   }
@@ -1329,6 +1329,18 @@ function renderToast(){
   const {toast}=S;
   const bg=toast.type==="err"?"#7f1d1d":toast.type==="warn"?"#78350f":"#14532d";
   return el("div",{class:"toast",style:{background:bg}},toast.msg);
+}
+
+// ── DATE HELPER ───────────────────────────────────────────────────────────────
+function formatDate(ts){
+  if(!ts) return "";
+  try{
+    const d=new Date(ts);
+    return d.toLocaleString("en-US",{
+      month:"short",day:"numeric",year:"numeric",
+      hour:"numeric",minute:"2-digit",hour12:true
+    });
+  }catch(e){return ts;}
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
