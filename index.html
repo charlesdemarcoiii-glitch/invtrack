@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606192103 -->
+<!DOCTYPE html><!-- InvTrack v202606192112 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -304,6 +304,17 @@ async function submitOrderCreate(orderQR, itemBarcodes){
 let checkoutInProgress = false;
 let transferInProgress = false;
 let orderReceiveInProgress = false;
+let lastActionTime = 0;
+
+function actionLock(fn) {
+  const now = Date.now();
+  if (now - lastActionTime < 2000) {
+    console.log("Action blocked - too soon after last action");
+    return;
+  }
+  lastActionTime = now;
+  fn();
+}
 async function submitOrderReceive(orderQR, toOwnerId){
   if(orderReceiveInProgress){return;}
   orderReceiveInProgress = true;
@@ -1310,10 +1321,12 @@ function renderModal(){
       if(!name){showToast("Enter item name","warn");return;}
       if(!pool){showToast("No pool found","err");return;}
       setState({loading:true});
+      actionLock(()=>{
       setState({modal:null,loading:false});
-    showToast("✅ "+name+" → "+(pool?.name||"Pool"));
-    submitCheckin(modal.barcode,name,type,expDate,pool.id)
-        .catch(function(e){console.error("Checkin write failed:",e);});
+      showToast("✅ "+name+" → "+(pool?.name||"Pool"));
+      submitCheckin(modal.barcode,name,type,expDate,pool.id)
+          .catch(function(e){console.error("Checkin write failed:",e);});
+    });
     };
     inner.appendChild(submitBtn);
   }
@@ -1343,7 +1356,7 @@ function renderModal(){
     const confirmBtn=document.createElement("button");
     confirmBtn.textContent="✅ Confirm — Move to Used";
     confirmBtn.style.cssText="width:100%;padding:16px;border-radius:10px;border:none;background:#f59e0b;color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;-webkit-appearance:none;";
-    confirmBtn.onclick=function(){confirmBtn.disabled=true;confirmBtn.textContent="Processing…";submitCheckout(modal.item);};
+    confirmBtn.onclick=function(){actionLock(()=>{confirmBtn.disabled=true;confirmBtn.textContent="Processing…";submitCheckout(modal.item);});};
     inner.appendChild(confirmBtn);
 
     const cancelBtn=document.createElement("button");
@@ -1423,7 +1436,7 @@ function renderModal(){
     confirmBtn.style.cssText="width:100%;padding:18px;border-radius:12px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:700;font-size:17px;cursor:pointer;display:block;font-family:inherit;margin-bottom:12px;";
     confirmBtn.onclick=function(){
       if(!destOwnerId){showToast("Select destination","warn");return;}
-      submitOrderReceive(order.id,destOwnerId);
+      actionLock(()=>{confirmBtn.disabled=true;confirmBtn.textContent="Processing…";submitOrderReceive(order.id,destOwnerId);});
     };
     inner2.appendChild(confirmBtn);
 
