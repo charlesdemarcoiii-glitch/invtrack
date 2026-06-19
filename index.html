@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606191840 -->
+<!DOCTYPE html><!-- InvTrack v202606192036 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -16,6 +16,28 @@
   <title>InvTrack</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAbN8qey649CWz9wb_iny5LiWveaUJ4_j4",
+      authDomain: "invtrack-bbe0e.firebaseapp.com",
+      projectId: "invtrack-bbe0e",
+      storageBucket: "invtrack-bbe0e.firebasestorage.app",
+      messagingSenderId: "501870517081",
+      appId: "1:501870517081:web:592f87f1633f3045b00a48"
+    };
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth = getAuth(firebaseApp);
+
+    // Expose to global scope for use in main script
+    window.firebaseAuth = auth;
+    window.firebaseSignIn = (email, password) => signInWithEmailAndPassword(auth, email, password);
+    window.firebaseSignOut = () => signOut(auth);
+    window.onAuthStateChanged = (callback) => onAuthStateChanged(auth, callback);
+  </script>
   <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
     html,body{background:#0a0f1c;color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
@@ -559,17 +581,19 @@ function render(){
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
 function renderLogin(){
-  let username="",password="",showPass=false;
+  let email="",password="",showPass=false;
   const div=el("div",{style:{minHeight:"100vh",background:"#0a0f1c",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}});
   const card=el("div",{style:{width:"100%",maxWidth:"380px",background:"#111827",borderRadius:"20px",padding:"32px",border:"1px solid #1e293b"}});
   const icon=el("div",{style:{textAlign:"center",marginBottom:"32px"}});
   icon.innerHTML=`<div style="font-size:48px;margin-bottom:10px">📦</div><h1 style="font-weight:800;font-size:26px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0">InvTrack</h1><p style="color:#475569;font-size:14px;margin:8px 0 0">Sign in to your inventory</p>`;
   card.appendChild(icon);
-  const uLabel=el("label",{class:"label"},"Username");
-  const uInput=el("input",{type:"text",placeholder:"Enter username"});
-  uInput.oninput=e=>username=e.target.value;
-  uInput.onkeydown=e=>{if(e.key==="Enter")doLogin();};
-  card.appendChild(uLabel);card.appendChild(uInput);card.appendChild(el("div",{style:{height:"16px"}}));
+
+  const eLabel=el("label",{class:"label"},"Email");
+  const eInput=el("input",{type:"email",placeholder:"Enter your email"});
+  eInput.oninput=e=>email=e.target.value;
+  eInput.onkeydown=e=>{if(e.key==="Enter")doLogin();};
+  card.appendChild(eLabel);card.appendChild(eInput);card.appendChild(el("div",{style:{height:"16px"}}));
+
   const pLabel=el("label",{class:"label"},"Password");
   const pWrap=el("div",{style:{position:"relative"}});
   const pInput=el("input",{type:"password",placeholder:"Enter password",style:{paddingRight:"48px"}});
@@ -579,20 +603,42 @@ function renderLogin(){
   eyeBtn.onclick=()=>{showPass=!showPass;pInput.type=showPass?"text":"password";eyeBtn.textContent=showPass?"🙈":"👁";};
   pWrap.appendChild(pInput);pWrap.appendChild(eyeBtn);
   card.appendChild(pLabel);card.appendChild(pWrap);
-  const errDiv=el("div",{style:{minHeight:"24px"}});
+
+  const errDiv=el("div",{style:{minHeight:"28px"}});
   card.appendChild(errDiv);
+
   const loginBtn=el("button",{class:"btn btn-primary",style:{marginTop:"16px"}},"Sign In →");
   loginBtn.onclick=doLogin;
   card.appendChild(loginBtn);
+
   function doLogin(){
-    const u=S.users.find(u=>u.username.toLowerCase()===username.toLowerCase()&&u.password===password);
-    if(u){
-      // Add to accounts if not already there
-      const existing=S.accounts.find(a=>a.username.toLowerCase()===u.username.toLowerCase());
-      const accounts=existing?S.accounts:[...S.accounts,u];
-      setState({user:u,accounts,showAccountMenu:false});
-    }
-    else errDiv.innerHTML=`<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ Incorrect username or password</p>`;
+    if(!email||!password){errDiv.innerHTML=`<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ Enter email and password</p>`;return;}
+    loginBtn.textContent="Signing in…";loginBtn.disabled=true;
+    if(!window.firebaseSignIn){errDiv.innerHTML=`<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ Auth not loaded yet, try again</p>`;loginBtn.textContent="Sign In →";loginBtn.disabled=false;return;}
+    window.firebaseSignIn(email,password)
+      .then(cred=>{
+        const firebaseEmail=cred.user.email;
+        // Match Firebase email to Users sheet row
+        const u=S.users.find(u=>u.username.toLowerCase()===firebaseEmail.toLowerCase()||u.email&&u.email.toLowerCase()===firebaseEmail.toLowerCase());
+        if(u){
+          const existing=S.accounts.find(a=>a.username.toLowerCase()===(u.username||firebaseEmail).toLowerCase());
+          const accounts=existing?S.accounts:[...S.accounts,{...u,email:firebaseEmail}];
+          setState({user:{...u,email:firebaseEmail,username:u.username||firebaseEmail},accounts,showAccountMenu:false});
+        } else {
+          // Use Firebase email as username, default to user role
+          const newUser={username:firebaseEmail,email:firebaseEmail,role:"user",ownerId:""};
+          setState({user:newUser,accounts:[...S.accounts,newUser],showAccountMenu:false});
+        }
+      })
+      .catch(err=>{
+        let msg="Incorrect email or password";
+        if(err.code==="auth/user-not-found")msg="No account found with this email";
+        if(err.code==="auth/wrong-password")msg="Incorrect password";
+        if(err.code==="auth/invalid-email")msg="Invalid email address";
+        if(err.code==="auth/too-many-requests")msg="Too many attempts — try again later";
+        errDiv.innerHTML=`<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ ${msg}</p>`;
+        loginBtn.textContent="Sign In →";loginBtn.disabled=false;
+      });
   }
   div.appendChild(card);return div;
 }
@@ -652,7 +698,7 @@ function renderApp(){
     // Sign out all
     const outAllBtn=el("button",{style:{width:"100%",padding:"10px 12px",borderRadius:"8px",border:"none",background:"transparent",color:"#f87171",fontSize:"13px",fontWeight:"600",display:"flex",alignItems:"center",gap:"8px",cursor:"pointer"}});
     outAllBtn.innerHTML=`<span>⇥</span> Sign Out All`;
-    outAllBtn.onclick=()=>setState({user:null,accounts:[],showAccountMenu:false,tab:"dashboard"});
+    outAllBtn.onclick=()=>{if(window.firebaseSignOut)window.firebaseSignOut();setState({user:null,accounts:[],showAccountMenu:false,tab:"dashboard"});};
     menu.appendChild(outAllBtn);
 
     hRight.appendChild(menu);
