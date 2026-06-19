@@ -1,0 +1,1506 @@
+<!DOCTYPE html><!-- InvTrack v202606192112 -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="InvTrack" />
+  <meta name="application-name" content="InvTrack" />
+  <meta name="msapplication-TileColor" content="#0a0f1c" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
+  <title>InvTrack</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAbN8qey649CWz9wb_iny5LiWveaUJ4_j4",
+      authDomain: "invtrack-bbe0e.firebaseapp.com",
+      projectId: "invtrack-bbe0e",
+      storageBucket: "invtrack-bbe0e.firebasestorage.app",
+      messagingSenderId: "501870517081",
+      appId: "1:501870517081:web:592f87f1633f3045b00a48"
+    };
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth = getAuth(firebaseApp);
+
+    // Expose to global scope for use in main script
+    window.firebaseAuth = auth;
+    window.firebaseSignIn = (email, password) => signInWithEmailAndPassword(auth, email, password);
+    window.firebaseSignOut = () => signOut(auth);
+    window.onAuthStateChanged = (callback) => onAuthStateChanged(auth, callback);
+  </script>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+    html,body{background:#0a0f1c;color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+    input,select,button,textarea{font-family:inherit;font-size:15px}
+    input,select{background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;width:100%}
+    input:focus,select:focus{outline:2px solid #0ea5e9;outline-offset:2px}
+    button{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,0,0,0);}
+    .page{min-height:100vh;background:#0a0f1c}
+    .card{background:#111827;border-radius:12px;border:1px solid #1e293b;padding:14px 16px;margin-bottom:8px}
+    .btn{border:none;border-radius:10px;color:#fff;font-weight:700;padding:13px;width:100%;font-size:15px;display:block}
+    .btn-primary{background:linear-gradient(135deg,#0ea5e9,#6366f1)}
+    .btn-green{background:linear-gradient(135deg,#22c55e,#16a34a)}
+    .btn-purple{background:linear-gradient(135deg,#6366f1,#4f46e5)}
+    .btn-orange{background:#f59e0b}
+    .btn-dark{background:#1e293b}
+    .btn-red{background:#dc2626}
+    .label{color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px}
+    .toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);padding:13px 24px;border-radius:12px;font-weight:600;font-size:14px;z-index:9999;max-width:88vw;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.5);white-space:nowrap}
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:flex-end;justify-content:center;z-index:500;-webkit-overflow-scrolling:touch;}
+    .overlay-inner{width:100%;max-width:480px;background:#111827;border-radius:20px 20px 0 0;padding:24px 20px 48px;border:1px solid #1e293b;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;z-index:501;}
+    .overlay-inner button{position:relative;z-index:502;-webkit-tap-highlight-color:rgba(0,0,0,0);touch-action:manipulation;}
+    .overlay-center{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px}
+    .tab-btn{flex:1;padding:12px 0;border:none;background:transparent;font-size:13px;cursor:pointer;border-bottom:2px solid transparent}
+    .action-btn{flex:1;padding:12px 0;border-radius:10px;font-weight:700;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:2px;border:none}
+    .badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px}
+    .mb8{margin-bottom:8px}
+    .mb16{margin-bottom:16px}
+    .mb20{margin-bottom:20px}
+    @media print{body *{visibility:hidden}#print-area,#print-area *{visibility:visible}#print-area{position:absolute;left:0;top:0;padding:20px;text-align:center}}
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<div id="print-area" style="display:none"></div>
+<script>
+// ── DATE HELPER ───────────────────────────────────────────────────────────────
+function formatDate(ts){
+  if(!ts) return "";
+  try{
+    const d=new Date(ts);
+    return d.toLocaleString("en-US",{
+      timeZone:"America/New_York",
+      month:"short",day:"numeric",year:"numeric",
+      hour:"numeric",minute:"2-digit",hour12:true
+    });
+  }catch(e){return ts;}
+}
+
+const CFG = {
+  apiKey: "AIzaSyCJVuxBvNUHCsDcraEJ0qrHahYIWTfRAXs",
+  sheetId: "1enxSBlIjswSHakVHErSs49X-xBIa5D5p16evLjGdxCQ"
+};
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw2S-dgkuZMJ9NoSz9DaW7sp9zmdpq53JC9xoRV9aMR5VINnugcliok9lKINMyxbbkm4Q/exec";
+
+// No OAuth needed — uses Apps Script as backend
+
+async function sheetsGet(range){
+  const url="https://sheets.googleapis.com/v4/spreadsheets/"+CFG.sheetId+"/values/"+encodeURIComponent(range)+"?key="+CFG.apiKey;
+  const r=await fetch(url);
+  if(!r.ok)throw new Error("GET failed: "+r.status);
+  const d=await r.json();
+  return d.values||[];
+}
+
+async function sheetsAppend(sheet,row){
+  const r=await fetch(SCRIPT_URL,{
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({action:"append",sheet:sheet,row:row})
+  });
+  if(!r.ok)throw new Error("HTTP error: "+r.status);
+  const d=await r.json();
+  if(!d.success)throw new Error(d.error||"Write failed");
+  return d;
+}
+
+async function sheetsAppendBatch(sheet,rows){
+  const r=await fetch(SCRIPT_URL,{
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({action:"appendBatch",sheet:sheet,rows:rows})
+  });
+  if(!r.ok)throw new Error("HTTP error: "+r.status);
+  const d=await r.json();
+  if(!d.success)throw new Error(d.error||"Batch write failed");
+  return d;
+}
+
+async function sheetsUpdate(rowNum,values,sheet){
+  const r=await fetch(SCRIPT_URL,{
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({action:"update",sheet:sheet||"Items",rowNum:rowNum,values:values})
+  });
+  if(!r.ok)throw new Error("HTTP error: "+r.status);
+  const d=await r.json();
+  if(!d.success)throw new Error(d.error||"Update failed");
+  return d;
+}
+
+async function findItemRow(barcode){
+  const values=await sheetsGet("Items!A2:H");
+  const idx=values.findIndex(r=>String(r[0])===String(barcode));
+  if(idx===-1)return null;
+  return{rowNum:idx+2,data:values[idx]};
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+const S = {
+  user:null,users:[],owners:[],items:[],orders:[],log:[],
+  accounts:[],        // all signed-in accounts [{username,password,role,ownerId}]
+  showAccountMenu:false, // account switcher dropdown
+  tab:"dashboard",loading:false,toast:null,toastTimer:null,
+  scanning:false,scanMode:null,scanHint:"",
+  modal:null,selectedOwner:null,
+  showScanPrompt:false,
+  // Multi-scan
+  multiMode:false,
+  multiDetails:null,   // {name,type,expDate} entered once
+  multiCodes:[],       // barcodes scanned
+  showMultiDetails:false,  // step 1: enter details
+  showMultiScan:false,     // step 2: scan codes
+  showMultiConfirm:false,  // step 3: confirm
+  // Order
+  activeOrder:null,showOrderGen:false,
+  // New order creation flow
+  orderItems:[],          // items scanned into order
+  showOrderItemScan:false, // scanning items for order
+  showOrderQRScan:false,   // scanning the order QR code
+  showOrderSummary:false,  // confirm screen before finalizing
+  pendingOrderQR:null,     // the scanned QR code for the order
+};
+
+function setState(u){Object.assign(S,u);render();}
+function showToast(msg,type="ok"){
+  if(S.toastTimer)clearTimeout(S.toastTimer);
+  const t=setTimeout(()=>setState({toast:null,toastTimer:null}),3500);
+  setState({toast:{msg,type},toastTimer:t});
+}
+
+// ── DATA ──────────────────────────────────────────────────────────────────────
+async function loadData(){
+  setState({loading:true});
+  try{
+    const [oR,iR,lR,uR,orR]=await Promise.all([
+      sheetsGet("Owners!A2:C"),sheetsGet("Items!A2:H"),
+      sheetsGet("Log!A2:G"),sheetsGet("Users!A2:D"),sheetsGet("Orders!A2:G")
+    ]);
+    setState({
+      owners:oR.map(r=>({id:r[0],name:r[1],type:r[2]})),
+      items:iR.map(r=>({barcode:r[0],name:r[1],type:r[2],expDate:r[3],ownerId:r[4],status:r[5]||"active",addedAt:r[6],usedBy:r[7]||""})),
+      log:lR.map(r=>({ts:r[0],action:r[1],barcode:r[2],itemName:r[3],from:r[4],to:r[5],user:r[6]})).reverse(),
+      users:uR.map(r=>({username:r[0],password:r[1],role:r[2],ownerId:r[3]})),
+      orders:orR.map(r=>({id:r[0],count:r[1],createdBy:r[2],createdAt:r[3],status:r[4],items:r[5]||""})),
+      loading:false
+    });
+  }catch(e){showToast("Could not load data","err");setState({loading:false});}
+}
+
+// ── ACTIONS ───────────────────────────────────────────────────────────────────
+async function submitCheckin(barcode,name,type,expDate,ownerId){
+  const now=new Date().toISOString();
+  const ownerName=S.owners.find(o=>o.id===ownerId)?.name||ownerId;
+  const orderRef=S.activeOrder?S.activeOrder.id:"";
+  // Optimistic UI — update local state immediately
+  const newItem={barcode,name,type,expDate,ownerId,status:"active",addedAt:now,usedBy:""};
+  setState({items:[...S.items,newItem]});
+  // Write to sheet in background
+  sheetsAppend("Items",[barcode,name,type,expDate,ownerId,"active",now,""]);
+  sheetsAppend("Log",[now,"CHECK_IN",barcode,name,orderRef,ownerName,S.user.username]);
+}
+
+async function submitMultiCheckin(){
+  const {multiDetails,multiCodes,user,owners,activeOrder}=S;
+  setState({loading:true,showMultiConfirm:false});
+  const pool=owners.find(o=>o.id==="POOL")||owners[0];
+  const now=new Date().toISOString();
+  try{
+    // Batch all item rows in one call
+    const itemRows=multiCodes.map(barcode=>[barcode,multiDetails.name,multiDetails.type,multiDetails.expDate,pool.id,"active",now,""]);
+    const logRows=multiCodes.map(barcode=>[now,"CHECK_IN",barcode,multiDetails.name,"",pool.name,user.username]);
+    await sheetsAppendBatch("Items",itemRows);
+    await sheetsAppendBatch("Log",logRows);
+    showToast(`✅ ${multiCodes.length} items checked in to ${pool.name}`);
+    setState({multiMode:false,multiDetails:null,multiCodes:[],showMultiDetails:false,showMultiScan:false,showMultiConfirm:false,activeOrder:null,scanMode:null});
+    await loadData();
+  }catch(e){showToast("Write failed — check permissions","err");setState({loading:false});}
+}
+
+async function submitCheckout(item){
+  setState({loading:true});
+  const now=new Date().toISOString();
+  const ownerName=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+  try{
+    const foundC=await findItemRow(item.barcode);
+    if(foundC){const{rowNum,data}=foundC;await sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"","USED","used",data[6]||"",S.user.username]);}
+    await sheetsAppend("Log",[now,"CHECK_OUT",item.barcode,item.name,ownerName,"USED",S.user.username]);
+    showToast(`📤 ${item.name} → Used`);
+    setState({modal:null});
+
+    await loadData();
+  }catch(e){showToast("Write failed","err");setState({loading:false});}
+}
+
+async function submitTransfer(item,toOwnerId){
+  if(transferInProgress) return;
+  transferInProgress = true;
+  const now=new Date().toISOString();
+  const fromName=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+  const toName=S.owners.find(o=>o.id===toOwnerId)?.name||toOwnerId;
+  // Optimistic UI — update local state immediately
+  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,ownerId:toOwnerId}:i);
+  setState({modal:null,loading:false,items:updatedItems});
+  showToast("🔄 "+item.name+" → "+toName);
+  // Write to sheet in background
+  findItemRow(item.barcode).then(found=>{
+    if(found){
+      const{rowNum,data}=found;
+      sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"",toOwnerId,data[5]||"active",data[6]||"",data[7]||""]);
+    }
+    sheetsAppend("Log",[now,"TRANSFER",item.barcode,item.name,fromName,toName,S.user.username]);
+  }).catch(e=>console.error("Transfer write failed:",e));
+}
+
+async function submitOrderCreate(orderQR, itemBarcodes){
+  const now=new Date().toISOString();
+  const user=S.user.username;
+  const poolName=S.owners.find(o=>o.id==="POOL")?.name||"Pool";
+
+  // Optimistic UI — update local state immediately
+  const newOrder={id:orderQR,count:itemBarcodes.length,createdBy:user,createdAt:now,status:"transit",items:itemBarcodes.join(",")};
+  const updatedItems=S.items.map(i=>itemBarcodes.includes(i.barcode)?{...i,status:"transit",ownerId:"TRANSIT"}:i);
+  setState({
+    loading:false,
+    showOrderSummary:false,
+    orderItems:[],
+    pendingOrderQR:null,
+    showOrderGen:false,
+    orders:[...S.orders,newOrder],
+    items:updatedItems
+  });
+  showToast("📦 Order created! "+itemBarcodes.length+" items in transit");
+
+  // Write to sheet in background
+  try{
+    sheetsAppend("Orders",[orderQR,itemBarcodes.length,user,now,"transit",itemBarcodes.join(",")]);
+    // Get all item rows at once then update
+    const allItems=await sheetsGet("Items!A2:H");
+    for(const barcode of itemBarcodes){
+      const idx=allItems.findIndex(r=>String(r[0])===String(barcode));
+      if(idx!==-1){
+        const rowNum=idx+2;
+        const data=allItems[idx];
+        sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"","TRANSIT","transit",data[6]||"",data[7]||""]);
+      }
+    }
+    const logRows=itemBarcodes.map(b=>[now,"ORDER_OUT",b,"",poolName,"TRANSIT",user]);
+    sheetsAppendBatch("Log",logRows);
+  }catch(e){
+    console.error("Order create background write failed:",e);
+  }
+}
+
+let checkoutInProgress = false;
+let transferInProgress = false;
+let orderReceiveInProgress = false;
+let lastActionTime = 0;
+
+function actionLock(fn) {
+  const now = Date.now();
+  if (now - lastActionTime < 2000) {
+    console.log("Action blocked - too soon after last action");
+    return;
+  }
+  lastActionTime = now;
+  fn();
+}
+async function submitOrderReceive(orderQR, toOwnerId){
+  if(orderReceiveInProgress){return;}
+  orderReceiveInProgress = true;
+  setState({modal:null,loading:true});
+  const now=new Date().toISOString();
+  const user=S.user.username;
+  const toName=S.owners.find(o=>o.id===toOwnerId)?.name||toOwnerId;
+  try{
+    const orderRow=S.orders.find(o=>o.id===orderQR);
+    if(!orderRow){showToast("Order not found","err");setState({loading:false});orderReceiveInProgress=false;return;}
+    const barcodes=(orderRow.items||"").split(",").filter(b=>b.trim());
+    if(barcodes.length===0){showToast("No items found in order","err");setState({loading:false});orderReceiveInProgress=false;return;}
+    
+    // Get all item rows at once
+    const allItems=await sheetsGet("Items!A2:H");
+    
+    // Build update requests for each barcode
+    for(const barcode of barcodes){
+      const idx=allItems.findIndex(r=>String(r[0])===String(barcode));
+      if(idx!==-1){
+        const rowNum=idx+2;
+        const data=allItems[idx];
+        await sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"",toOwnerId,"active",data[6]||"",data[7]||""]);
+      }
+    }
+    
+    // Batch log all items
+    const logRows=barcodes.map(b=>[now,"ORDER_IN",b,"","TRANSIT",toName,user]);
+    await sheetsAppendBatch("Log",logRows);
+    
+    // Update order status to received in Orders sheet
+    const ordersData=await sheetsGet("Orders!A2:F");
+    const oIdx=ordersData.findIndex(r=>String(r[0])===String(orderQR));
+    if(oIdx!==-1){
+      const oRow=ordersData[oIdx];
+      await sheetsUpdate(oIdx+2,[oRow[0]||"",oRow[1]||"",oRow[2]||"",oRow[3]||"","received",oRow[5]||""],"Orders");
+    }
+    
+    showToast("✅ "+barcodes.length+" items received into "+toName);
+    await loadData();
+  }catch(e){
+    showToast("Failed: "+e.message,"err");
+    setState({loading:false});
+  }finally{
+    orderReceiveInProgress=false;
+  }
+}
+
+function handleScan(barcode){
+  const {scanMode,activeOrder,items,multiCodes,showMultiScan}=S;
+  stopScanner();
+
+  // Order item scan mode — collecting items for a new order
+  if(S.showOrderItemScan){
+    const item=items.find(i=>i.barcode===barcode);
+    if(item){
+      if(item.status==="used"){showToast("Item already used","warn");setState({scanning:true});return;}
+      if(item.status==="transit"){showToast("Item already in transit","warn");setState({scanning:true});return;}
+      if(S.orderItems.includes(barcode)){showToast("Already added to order","warn");setState({scanning:true});return;}
+      const newItems=[...S.orderItems,barcode];
+      setState({orderItems:newItems,scanning:true});
+      showToast("📦 "+newItems.length+" item"+(newItems.length>1?"s":"")+" added to order");
+    } else {
+      showToast("Item not found — must be checked in first","err");
+      setState({scanning:true});
+    }
+    return;
+  }
+
+  // Order QR scan mode — scanning the master QR for the order
+  if(S.showOrderQRScan){
+    // Make sure this barcode isn't already an order
+    if(S.orders.find(o=>o.id===barcode)){showToast("This QR is already an order","err");setState({scanning:true});return;}
+    // Make sure it's not an active item
+    const existingItem=items.find(i=>i.barcode===barcode);
+    if(existingItem&&existingItem.status==="active"&&!S.orderItems.includes(barcode)){
+      showToast("This QR belongs to an active item — use a blank QR","warn");setState({scanning:true});return;
+    }
+    setState({scanning:false,showOrderQRScan:false,pendingOrderQR:barcode,showOrderSummary:true});
+    return;
+  }
+
+  // Multi-scan mode — just collect codes
+  if(showMultiScan){
+    if(items.find(i=>i.barcode===barcode)){showToast("Already tracked: "+barcode,"warn");setState({scanning:true});return;}
+    if(multiCodes.includes(barcode)){showToast("Already scanned this code","warn");setState({scanning:true});return;}
+    const newCodes=[...multiCodes,barcode];
+    setState({multiCodes:newCodes,scanning:true});
+    showToast(`📦 Code ${newCodes.length} scanned`);
+    return;
+  }
+
+  setState({scanning:false});
+
+  if(scanMode==="order"&&!activeOrder){
+    const order=S.orders.find(o=>o.id===barcode);
+    if(!order){showToast("Order not found","err");return;}
+    setState({activeOrder:order,scanning:true,scanHint:"Scan items to add to order"});
+    showToast(`📦 Order: ${order.name} — scan items`);
+    return;
+  }
+  if(scanMode==="order"&&activeOrder){
+    if(items.find(i=>i.barcode===barcode)){showToast("Already tracked","warn");setState({scanning:true});return;}
+    setState({modal:{type:"checkin",barcode,orderMode:true}});return;
+  }
+  if(scanMode==="checkin"){
+    if(items.find(i=>i.barcode===barcode)){showToast("Already tracked — item exists","warn");return;}
+    setState({modal:{type:"checkin",barcode,orderMode:false}});return;
+  }
+  if(scanMode==="checkout"){
+    const item=items.find(i=>i.barcode===barcode);
+    if(!item){showToast("Item not found","err");return;}
+    if(item.status==="used"){showToast("Already checked out","warn");return;}
+    if(S.user.role!=="admin"&&item.ownerId!==S.user.ownerId){showToast("You can only check out items in your own inventory","err");return;}
+    setState({modal:{type:"checkout",item}});return;
+  }
+  if(scanMode==="transfer"){
+    // Check if this is an order QR code first
+    const order=S.orders.find(o=>o.id===barcode);
+    if(order){
+      if(order.status==="received"){showToast("Order already received","warn");return;}
+      const barcodes=(order.items||"").split(",").filter(b=>b.trim());
+      if(barcodes.length===0){showToast("Order has no items","warn");return;}
+      setState({modal:{type:"receive_order",order,barcodes,toOwnerId:S.user.role==="admin"?"":S.user.ownerId}});
+      return;
+    }
+    const item=items.find(i=>i.barcode===barcode);
+    if(!item){showToast("Item not found — check in first","err");return;}
+    if(item.status==="used"){showToast("Item already used","warn");return;}
+    if(item.status==="transit"){showToast("Item is in transit — receive the order instead","warn");return;}
+    if(S.user.role!=="admin"&&item.ownerId===S.user.ownerId){
+      showToast("Item is already in your inventory","warn");return;
+    }
+    setState({modal:{type:"transfer",item}});
+  }
+}
+
+// ── SCANNER ───────────────────────────────────────────────────────────────────
+let scanStream=null,scanInterval=null;
+function startScanner(){
+  const video=document.getElementById("scan-video");
+  const canvas=document.getElementById("scan-canvas");
+  const status=document.getElementById("scan-status");
+  if(!video||!canvas)return;
+  navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}}})
+    .then(stream=>{
+      scanStream=stream;video.srcObject=stream;video.play();
+      if(window.jsQR){
+        if(status)status.textContent=S.scanHint||"Point camera at QR code";
+        scanInterval=setInterval(()=>{
+          if(video.readyState!==4)return;
+          const size=Math.min(video.videoWidth,video.videoHeight)*0.8;
+          const x=(video.videoWidth-size)/2,y=(video.videoHeight-size)/2;
+          canvas.width=size;canvas.height=size;
+          const ctx=canvas.getContext("2d");
+          ctx.drawImage(video,x,y,size,size,0,0,size,size);
+          const img=ctx.getImageData(0,0,size,size);
+          const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:"dontInvert"});
+          if(code&&code.data)handleScan(code.data);
+        },150);
+      }else{if(status)status.textContent="Type code manually below";}
+    })
+    .catch(()=>{const s=document.getElementById("scan-status");if(s)s.textContent="Camera unavailable — type code below";});
+}
+function stopScanner(){
+  clearInterval(scanInterval);scanInterval=null;
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+}
+
+// ── EL HELPER ─────────────────────────────────────────────────────────────────
+function el(tag,attrs={},...children){
+  const e=document.createElement(tag);
+  for(const[k,v]of Object.entries(attrs)){
+    if(k==="onclick")e.onclick=v;
+    else if(k==="onchange")e.onchange=v;
+    else if(k==="oninput")e.oninput=v;
+    else if(k==="onkeydown")e.onkeydown=v;
+    else if(k==="style")Object.assign(e.style,v);
+    else if(k==="class")e.className=v;
+    else e.setAttribute(k,v);
+  }
+  for(const c of children){
+    if(c==null)continue;
+    if(typeof c==="string"||typeof c==="number")e.appendChild(document.createTextNode(c));
+    else e.appendChild(c);
+  }
+  return e;
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+
+function renderOrderSummary(){
+  const {orderItems,pendingOrderQR,items,owners,user}=S;
+  const page=document.createElement("div");
+  page.style.cssText="position:fixed;inset:0;background:#0a0f1c;z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+  const inner=document.createElement("div");
+  inner.style.cssText="max-width:480px;margin:0 auto;padding:24px 20px;";
+
+  const hdr=document.createElement("div");
+  hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-top:8px;";
+  const title=document.createElement("h2");
+  title.style.cssText="color:#f1f5f9;font-size:20px;font-weight:700;margin:0;";
+  title.textContent="Confirm Order";
+  const xBtn=document.createElement("button");
+  xBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:18px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit;";
+  xBtn.textContent="✕ Cancel";
+  xBtn.onclick=function(){setState({showOrderSummary:false,orderItems:[],pendingOrderQR:null});};
+  hdr.appendChild(title);hdr.appendChild(xBtn);
+  inner.appendChild(hdr);
+
+  // Order QR
+  const qrCard=document.createElement("div");
+  qrCard.style.cssText="background:#6366f118;border:1px solid #6366f133;border-radius:12px;padding:16px;margin-bottom:16px;";
+  qrCard.innerHTML="<div style='color:#818cf8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px'>Order QR Code</div>"
+    +"<div style='color:#c084fc;font-weight:700;font-size:15px;font-family:monospace'>"+pendingOrderQR+"</div>";
+  inner.appendChild(qrCard);
+
+  // Item count
+  const countCard=document.createElement("div");
+  countCard.style.cssText="background:#0ea5e918;border:1px solid #0ea5e933;border-radius:12px;padding:20px;margin-bottom:16px;text-align:center;";
+  countCard.innerHTML="<div style='color:#38bdf8;font-size:40px;font-weight:800'>"+orderItems.length+"</div>"
+    +"<div style='color:#7dd3fc;font-size:14px;margin-top:4px'>item"+(orderItems.length!==1?"s":"")+" will move to In Transit</div>";
+  inner.appendChild(countCard);
+
+  // Item list
+  const listCard=document.createElement("div");
+  listCard.style.cssText="background:#111827;border-radius:12px;border:1px solid #1e293b;padding:14px;margin-bottom:20px;max-height:200px;overflow-y:auto;";
+  const listTitle=document.createElement("div");
+  listTitle.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;";
+  listTitle.textContent="Items in Order";
+  listCard.appendChild(listTitle);
+  orderItems.forEach(function(barcode){
+    const item=items.find(i=>i.barcode===barcode);
+    const row=document.createElement("div");
+    row.style.cssText="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e293b;";
+    row.innerHTML="<span style='color:#f1f5f9;font-size:13px'>"+(item?item.name:barcode)+"</span>"
+      +"<span style='color:#64748b;font-size:11px;font-family:monospace'>"+barcode+"</span>";
+    listCard.appendChild(row);
+  });
+  inner.appendChild(listCard);
+
+  const confirmBtn=document.createElement("button");
+  confirmBtn.textContent="✓ Create Order & Move to Transit";
+  confirmBtn.style.cssText="width:100%;padding:18px;border-radius:12px;border:none;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:700;font-size:17px;cursor:pointer;display:block;font-family:inherit;margin-bottom:12px;";
+  confirmBtn.onclick=function(){submitOrderCreate(pendingOrderQR,orderItems);};
+  inner.appendChild(confirmBtn);
+
+  const backBtn=document.createElement("button");
+  backBtn.textContent="← Scan More Items";
+  backBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;";
+  backBtn.onclick=function(){setState({showOrderSummary:false,showOrderItemScan:true,scanning:true,scanHint:"Scan items to add to order"});};
+  inner.appendChild(backBtn);
+
+  const cancelBtn=document.createElement("button");
+  cancelBtn.textContent="Cancel Order";
+  cancelBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #dc2626;background:transparent;color:#f87171;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";
+  cancelBtn.onclick=function(){setState({showOrderSummary:false,orderItems:[],pendingOrderQR:null,showOrderItemScan:false,showOrderQRScan:false});};
+  inner.appendChild(cancelBtn);
+
+  page.appendChild(inner);
+  return page;
+}
+
+function render(){
+  const app=document.getElementById("app");
+  app.innerHTML="";
+  if(!S.user){app.appendChild(renderLogin());return;}
+  app.appendChild(renderApp());
+  if(S.scanning){app.appendChild(renderScanner());setTimeout(startScanner,100);}
+  if(S.showScanPrompt)app.appendChild(renderScanPrompt());
+  if(S.showMultiDetails)app.appendChild(renderMultiDetails());
+  if(S.showMultiScan)app.appendChild(renderMultiScan());
+  if(S.showMultiConfirm)app.appendChild(renderMultiConfirm());
+  if(S.showOrderGen)app.appendChild(renderOrderGen());
+  if(S.showOrderSummary)app.appendChild(renderOrderSummary());
+  if(S.modal)app.appendChild(renderModal());
+  if(S.toast)app.appendChild(renderToast());
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+function renderLogin(){
+  let email="",password="",showPass=false;
+  const div=el("div",{style:{minHeight:"100vh",background:"#0a0f1c",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}});
+  const card=el("div",{style:{width:"100%",maxWidth:"380px",background:"#111827",borderRadius:"20px",padding:"32px",border:"1px solid #1e293b"}});
+  const icon=el("div",{style:{textAlign:"center",marginBottom:"32px"}});
+  icon.innerHTML=`<div style="font-size:48px;margin-bottom:10px">📦</div><h1 style="font-weight:800;font-size:26px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0">InvTrack</h1><p style="color:#475569;font-size:14px;margin:8px 0 0">Sign in to your inventory</p>`;
+  card.appendChild(icon);
+
+  const eLabel=el("label",{class:"label"},"Email");
+  const eInput=el("input",{type:"email",placeholder:"Enter your email"});
+  eInput.oninput=e=>email=e.target.value;
+  eInput.onkeydown=e=>{if(e.key==="Enter")doLogin();};
+  card.appendChild(eLabel);card.appendChild(eInput);card.appendChild(el("div",{style:{height:"16px"}}));
+
+  const pLabel=el("label",{class:"label"},"Password");
+  const pWrap=el("div",{style:{position:"relative"}});
+  const pInput=el("input",{type:"password",placeholder:"Enter password",style:{paddingRight:"48px"}});
+  pInput.oninput=e=>password=e.target.value;
+  pInput.onkeydown=e=>{if(e.key==="Enter")doLogin();};
+  const eyeBtn=el("button",{style:{position:"absolute",right:"14px",top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#475569",fontSize:"18px",padding:"0"}},"👁");
+  eyeBtn.onclick=()=>{showPass=!showPass;pInput.type=showPass?"text":"password";eyeBtn.textContent=showPass?"🙈":"👁";};
+  pWrap.appendChild(pInput);pWrap.appendChild(eyeBtn);
+  card.appendChild(pLabel);card.appendChild(pWrap);
+
+  const errDiv=el("div",{style:{minHeight:"28px"}});
+  card.appendChild(errDiv);
+
+  const loginBtn=el("button",{class:"btn btn-primary",style:{marginTop:"16px"}},"Sign In →");
+  loginBtn.onclick=doLogin;
+  card.appendChild(loginBtn);
+
+  function doLogin(){
+    if(!email||!password){errDiv.innerHTML=`<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ Enter email and password</p>`;return;}
+    loginBtn.textContent="Signing in…";loginBtn.disabled=true;
+    if(!window.firebaseSignIn){errDiv.innerHTML=`<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ Auth not loaded yet, try again</p>`;loginBtn.textContent="Sign In →";loginBtn.disabled=false;return;}
+    window.firebaseSignIn(email,password)
+      .then(cred=>{
+        const firebaseEmail=cred.user.email;
+        // Match Firebase email to Users sheet row
+        const u=S.users.find(u=>u.username.toLowerCase()===firebaseEmail.toLowerCase()||u.email&&u.email.toLowerCase()===firebaseEmail.toLowerCase());
+        if(u){
+          const existing=S.accounts.find(a=>a.username.toLowerCase()===(u.username||firebaseEmail).toLowerCase());
+          const accounts=existing?S.accounts:[...S.accounts,{...u,email:firebaseEmail}];
+          setState({user:{...u,email:firebaseEmail,username:u.username||firebaseEmail},accounts,showAccountMenu:false});
+        } else {
+          // Use Firebase email as username, default to user role
+          const newUser={username:firebaseEmail,email:firebaseEmail,role:"user",ownerId:""};
+          setState({user:newUser,accounts:[...S.accounts,newUser],showAccountMenu:false});
+        }
+      })
+      .catch(err=>{
+        let msg="Incorrect email or password";
+        if(err.code==="auth/user-not-found")msg="No account found with this email";
+        if(err.code==="auth/wrong-password")msg="Incorrect password";
+        if(err.code==="auth/invalid-email")msg="Invalid email address";
+        if(err.code==="auth/too-many-requests")msg="Too many attempts — try again later";
+        errDiv.innerHTML=`<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ ${msg}</p>`;
+        loginBtn.textContent="Sign In →";loginBtn.disabled=false;
+      });
+  }
+  div.appendChild(card);return div;
+}
+
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
+function renderApp(){
+  const {user,items,owners,orders,log,tab,loading,selectedOwner,activeOrder,multiMode,multiCodes}=S;
+  const isAdmin=user.role==="admin";
+
+  // Separate active and used items
+  const activeItems=items.filter(i=>i.status!=="used");
+  const usedItems=items.filter(i=>i.status==="used");
+  const visActiveItems=isAdmin?activeItems:activeItems.filter(i=>i.ownerId===user.ownerId);
+  const visUsedItems=isAdmin?usedItems:usedItems.filter(i=>i.usedBy===user.username);
+  const visOwners=isAdmin?owners.filter(o=>o.id!=="USED"):owners.filter(o=>o.id===user.ownerId);
+  const expSoon=visActiveItems.filter(i=>{if(!i.expDate)return false;const d=(new Date(i.expDate)-Date.now())/86400000;return d>=0&&d<=120;});
+  const expired=visActiveItems.filter(i=>i.expDate&&new Date(i.expDate)<new Date());
+
+  const wrap=el("div",{class:"page"});
+
+  // HEADER
+  const header=el("div",{style:{background:"#111827",borderBottom:"1px solid #1e293b",padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:"0",zIndex:"100"}});
+  const logo=el("div",{style:{display:"flex",alignItems:"center",gap:"10px"}});
+  logo.innerHTML=`<span style="font-size:22px">📦</span><span style="font-weight:800;font-size:18px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent">InvTrack</span>`;
+  const hRight=el("div",{style:{display:"flex",alignItems:"center",gap:"8px",position:"relative"}});
+  
+  // Account switcher button
+  const acctBtn=el("button",{style:{background:"#1e293b",border:"1px solid #334155",borderRadius:"8px",padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:"6px"}});
+  acctBtn.innerHTML=`<div style="text-align:right"><div style="color:#f1f5f9;font-size:13px;font-weight:700">${user.username}</div><div style="color:${isAdmin?"#818cf8":"#38bdf8"};font-size:10px;text-transform:uppercase;font-weight:600">${user.role}</div></div><span style="color:#64748b;font-size:10px">▾</span>`;
+  acctBtn.onclick=()=>setState({showAccountMenu:!S.showAccountMenu});
+  hRight.appendChild(acctBtn);
+
+  // Account dropdown menu
+  if(S.showAccountMenu){
+    const menu=el("div",{style:{position:"absolute",top:"44px",right:"0",background:"#1e293b",border:"1px solid #334155",borderRadius:"12px",padding:"8px",zIndex:"1000",minWidth:"180px",boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}});
+    
+    // Signed in accounts
+    S.accounts.forEach(acct=>{
+      const isActive=acct.username===user.username;
+      const row=el("button",{style:{width:"100%",padding:"10px 12px",borderRadius:"8px",border:"none",background:isActive?"#0ea5e918":"transparent",color:isActive?"#38bdf8":"#f1f5f9",fontWeight:isActive?"700":"400",fontSize:"13px",display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",marginBottom:"2px",textAlign:"left"}});
+      row.innerHTML=`<span style="font-size:16px">${acct.role==="admin"?"👑":"👤"}</span><div><div>${acct.username}</div><div style="font-size:10px;color:${isActive?"#38bdf8":"#64748b"};text-transform:uppercase">${acct.role}${isActive?" · Active":""}</div></div>`;
+      if(!isActive){
+        row.onclick=()=>{setState({user:acct,tab:"dashboard",showAccountMenu:false});};
+      }
+      menu.appendChild(row);
+    });
+
+    // Divider
+    menu.appendChild(el("div",{style:{height:"1px",background:"#334155",margin:"6px 0"}}));
+
+    // Add account button
+    const addBtn=el("button",{style:{width:"100%",padding:"10px 12px",borderRadius:"8px",border:"none",background:"transparent",color:"#22c55e",fontSize:"13px",fontWeight:"600",display:"flex",alignItems:"center",gap:"8px",cursor:"pointer"}});
+    addBtn.innerHTML=`<span>＋</span> Add Account`;
+    addBtn.onclick=()=>setState({user:null,showAccountMenu:false});
+    menu.appendChild(addBtn);
+
+    // Sign out all
+    const outAllBtn=el("button",{style:{width:"100%",padding:"10px 12px",borderRadius:"8px",border:"none",background:"transparent",color:"#f87171",fontSize:"13px",fontWeight:"600",display:"flex",alignItems:"center",gap:"8px",cursor:"pointer"}});
+    outAllBtn.innerHTML=`<span>⇥</span> Sign Out All`;
+    outAllBtn.onclick=()=>{if(window.firebaseSignOut)window.firebaseSignOut();setState({user:null,accounts:[],showAccountMenu:false,tab:"dashboard"});};
+    menu.appendChild(outAllBtn);
+
+    hRight.appendChild(menu);
+    // Close menu when clicking outside
+    setTimeout(()=>{
+      document.addEventListener("click",function closeMenu(e){
+        if(!acctBtn.contains(e.target)&&!menu.contains(e.target)){
+          setState({showAccountMenu:false});
+          document.removeEventListener("click",closeMenu);
+        }
+      });
+    },0);
+  }
+
+  const syncBtn=el("button",{style:{padding:"8px 10px",borderRadius:"8px",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:"14px"}},"⟳");
+  syncBtn.onclick=loadData;
+  hRight.appendChild(syncBtn);
+  header.appendChild(logo);header.appendChild(hRight);
+  wrap.appendChild(header);
+
+  // ORDER BANNER
+  if(activeOrder){
+    const banner=el("div",{style:{background:"#1e1b4b",borderBottom:"1px solid #4338ca",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}});
+    banner.innerHTML=`<span style="color:#818cf8;font-weight:700;font-size:13px">🗃 ${activeOrder.name}</span>`;
+    const endBtn=el("button",{style:{background:"none",border:"none",color:"#6366f1",fontSize:"13px",fontWeight:"600"}},"End");
+    endBtn.onclick=()=>setState({activeOrder:null,scanMode:null});
+    banner.appendChild(endBtn);wrap.appendChild(banner);
+  }
+
+  // ACTION BAR
+  const actions=el("div",{style:{display:"flex",gap:"8px",padding:"12px 16px",background:"#0f172a",borderBottom:"1px solid #1e293b"}});
+  if(isAdmin){
+    const btn=el("button",{class:"action-btn",style:{background:"#22c55e18",border:"1px solid #22c55e33",color:"#22c55e"}});
+    btn.innerHTML=`<span style="font-size:20px">📥</span><span>Check In</span>`;
+    btn.onclick=()=>setState({scanMode:"checkin",showScanPrompt:true});
+    actions.appendChild(btn);
+  }
+  [["checkout","📤","Check Out","#f59e0b"],["transfer","🔄","Transfer","#6366f1"]].forEach(([mode,icon,label,color])=>{
+    const btn=el("button",{class:"action-btn",style:{background:`${color}18`,border:`1px solid ${color}33`,color}});
+    btn.innerHTML=`<span style="font-size:20px">${icon}</span><span>${label}</span>`;
+    btn.onclick=()=>setState({scanMode:mode,scanning:true,scanHint:"Point camera at QR code"});
+    actions.appendChild(btn);
+  });
+  if(isAdmin){
+    const btn=el("button",{class:"action-btn",style:{background:"#a855f718",border:"1px solid #a855f733",color:"#c084fc"}});
+    btn.innerHTML=`<span style="font-size:20px">🗃</span><span>Order</span>`;
+    btn.onclick=()=>setState({orderItems:[],showOrderItemScan:true,showOrderQRScan:false,showOrderSummary:false,pendingOrderQR:null,scanning:true,scanHint:"Scan items to add to order"});
+    actions.appendChild(btn);
+  }
+  wrap.appendChild(actions);
+
+  // TABS
+  const tabs=el("div",{style:{display:"flex",borderBottom:"1px solid #1e293b",background:"#111827"}});
+  [["dashboard","Dashboard"],["inventory","Inventory"],["used","Used"],["orders","Orders"],["log","Log"]].forEach(([id,label])=>{
+    const btn=el("button",{class:"tab-btn",style:{color:tab===id?"#38bdf8":"#475569",fontWeight:tab===id?"700":"500",borderBottom:tab===id?"2px solid #38bdf8":"2px solid transparent",fontSize:"12px"}},label);
+    btn.onclick=()=>setState({tab:id});
+    tabs.appendChild(btn);
+  });
+  wrap.appendChild(tabs);
+
+  // CONTENT
+  const content=el("div",{style:{padding:"16px",maxWidth:"480px",margin:"0 auto",paddingBottom:"32px"}});
+  if(loading)content.appendChild(el("p",{style:{textAlign:"center",color:"#475569",fontSize:"13px"}},"Loading…"));
+
+  // DASHBOARD
+  if(tab==="dashboard"){
+    const welcome=el("div",{class:"card",style:{background:"linear-gradient(135deg,#0ea5e918,#6366f118)",marginBottom:"12px"}});
+    welcome.innerHTML=`<p style="margin:0;color:#94a3b8;font-size:14px">Welcome, <span style="color:#f1f5f9;font-weight:700">${user.username}</span>${isAdmin?'<span style="color:#818cf8;font-weight:600"> · Admin</span>':''}</p>`;
+    content.appendChild(welcome);
+    const stats=el("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:"8px",marginBottom:"12px"}});
+    [["Active",visActiveItems.length,"#38bdf8"],["Expiring",expSoon.length,"#f59e0b"],["Expired",expired.length,"#ef4444"],["Used",visUsedItems.length,"#94a3b8"]].forEach(([label,val,color])=>{
+      const s=el("div",{style:{background:"#111827",borderRadius:"12px",padding:"12px 6px",border:`1px solid ${color}33`,textAlign:"center"}});
+      s.innerHTML=`<div style="color:${color};font-size:22px;font-weight:800">${val}</div><div style="color:#64748b;font-size:10px;margin-top:2px">${label}</div>`;
+      stats.appendChild(s);
+    });
+    content.appendChild(stats);
+    if(expired.length>0){
+      const alert=el("div",{style:{background:"#450a0a",border:"1px solid #7f1d1d",borderRadius:"10px",padding:"14px",marginBottom:"8px"}});
+      alert.innerHTML=`<p style="color:#fca5a5;font-weight:700;font-size:13px;margin:0 0 8px">⚠️ Expired (${expired.length})</p>${expired.map(i=>`<p style="color:#f87171;font-size:12px;margin:2px 0">• ${i.name} — ${i.expDate}</p>`).join("")}`;
+      content.appendChild(alert);
+    }
+    if(expSoon.length>0){
+      const alert=el("div",{style:{background:"#431407",border:"1px solid #78350f",borderRadius:"10px",padding:"14px",marginBottom:"8px"}});
+      alert.innerHTML=`<p style="color:#fcd34d;font-weight:700;font-size:13px;margin:0 0 8px">⏰ Expiring Within 120 Days (${expSoon.length})</p>${expSoon.map(i=>{const d=Math.ceil((new Date(i.expDate)-Date.now())/86400000);return`<p style="color:#fbbf24;font-size:12px;margin:2px 0">• ${i.name} — ${d}d left</p>`;}).join("")}`;
+      content.appendChild(alert);
+    }
+    content.appendChild(el("p",{style:{color:"#475569",fontSize:"11px",fontWeight:"600",margin:"12px 0 8px",textTransform:"uppercase",letterSpacing:".07em"}},isAdmin?"All Inventories":"Your Inventory"));
+    visOwners.forEach(owner=>{
+      const oi=activeItems.filter(i=>i.ownerId===owner.id);
+      const oe=oi.filter(i=>i.expDate&&new Date(i.expDate)<new Date());
+      const card=el("div",{class:"card",style:{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}});
+      const icon=owner.id==="POOL"?"🏪":owner.type==="locker"?"🗄":"👤";
+      card.innerHTML=`<div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">${icon}</span><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">${owner.name}</div><div style="color:#64748b;font-size:11px">${owner.type}</div></div></div><div style="text-align:right"><div style="font-weight:700;color:#38bdf8;font-size:20px">${oi.length}</div>${oe.length>0?`<div style="color:#ef4444;font-size:11px">${oe.length} exp</div>`:""}</div>`;
+      card.onclick=()=>setState({selectedOwner:owner,tab:"inventory"});
+      content.appendChild(card);
+    });
+  }
+
+  // INVENTORY
+  if(tab==="inventory"){
+    if(isAdmin){
+      const filters=el("div",{style:{display:"flex",gap:"8px",marginBottom:"12px",flexWrap:"wrap"}});
+      const allBtn=el("button",{style:{padding:"7px 14px",borderRadius:"7px",border:"1px solid #334155",background:!selectedOwner?"#0ea5e9":"#1e293b",color:!selectedOwner?"#fff":"#94a3b8",fontSize:"13px",fontWeight:"600"}},"All");
+      allBtn.onclick=()=>setState({selectedOwner:null});
+      filters.appendChild(allBtn);
+      owners.filter(o=>o.id!=="USED").forEach(o=>{
+        const icon=o.id==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";
+        const btn=el("button",{style:{padding:"7px 14px",borderRadius:"7px",border:"1px solid #334155",background:selectedOwner?.id===o.id?"#0ea5e9":"#1e293b",color:selectedOwner?.id===o.id?"#fff":"#94a3b8",fontSize:"13px",fontWeight:"600"}},`${icon} ${o.name}`);
+        btn.onclick=()=>setState({selectedOwner:o});
+        filters.appendChild(btn);
+      });
+      content.appendChild(filters);
+    }
+    const displayItems=isAdmin?(selectedOwner?activeItems.filter(i=>i.ownerId===selectedOwner.id):activeItems):visActiveItems;
+    // Show count summary per item type for selected owner
+    if(displayItems.length>0){
+      const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT"];
+      const counts={};
+      displayItems.forEach(function(item){
+        if(itemTypes.includes(item.name)){
+          counts[item.name]=(counts[item.name]||0)+1;
+        }
+      });
+      const hasKnown=Object.keys(counts).length>0;
+      if(hasKnown){
+        const summaryCard=document.createElement("div");
+        summaryCard.style.cssText="background:#111827;border-radius:12px;border:1px solid #1e293b;padding:14px 16px;margin-bottom:16px;";
+        const summaryTitle=document.createElement("p");
+        summaryTitle.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px;";
+        summaryTitle.textContent=selectedOwner?"Count — "+selectedOwner.name:"Count — All Inventories";
+        summaryCard.appendChild(summaryTitle);
+        const grid=document.createElement("div");
+        grid.style.cssText="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;";
+        itemTypes.forEach(function(t){
+          if(counts[t]){
+            const chip=document.createElement("div");
+            chip.style.cssText="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px 10px;text-align:center;";
+            chip.innerHTML="<div style='color:#38bdf8;font-weight:700;font-size:18px'>"+counts[t]+"</div><div style='color:#64748b;font-size:11px;margin-top:2px'>"+t+"</div>";
+            grid.appendChild(chip);
+          }
+        });
+        summaryCard.appendChild(grid);
+        content.appendChild(summaryCard);
+      }
+    }
+    // Show transit items if admin
+    const transitItems=items.filter(i=>i.status==="transit");
+    if(isAdmin&&transitItems.length>0){
+      const tCard=document.createElement("div");
+      tCard.style.cssText="background:#431407;border:1px solid #78350f;border-radius:10px;padding:14px;margin-bottom:12px;";
+      tCard.innerHTML="<p style='color:#fcd34d;font-weight:700;font-size:13px;margin:0 0 8px'>🚚 In Transit ("+transitItems.length+")</p>"
+        +transitItems.map(i=>"<p style='color:#fbbf24;font-size:12px;margin:2px 0'>• "+i.name+" — "+i.barcode+"</p>").join("");
+      content.appendChild(tCard);
+    }
+    if(displayItems.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No active items"));
+    displayItems.forEach(item=>{
+      const isExp=item.expDate&&new Date(item.expDate)<new Date();
+      const days=item.expDate?Math.ceil((new Date(item.expDate)-Date.now())/86400000):null;
+      const soon=days!==null&&days>=0&&days<=120;
+      const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",border:`1px solid ${isExp?"#7f1d1d":soon?"#78350f":"#1e293b"}`}});
+      const badge=isExp?`<span class="badge" style="background:#7f1d1d;color:#fca5a5">EXPIRED</span>`:soon?`<span class="badge" style="background:#78350f;color:#fcd34d">${days}d LEFT</span>`:`<span class="badge" style="background:#14532d;color:#86efac">OK</span>`;
+      card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">${item.name}</div><div style="color:#64748b;font-size:11px;margin-top:2px;font-family:monospace">${item.barcode} · ${item.type}</div></div>${badge}</div><div style="display:flex;gap:12px;margin-top:6px"><span style="color:#64748b;font-size:11px">Exp: ${item.expDate||"—"}</span>${isAdmin?`<span style="color:#64748b;font-size:11px">Owner: ${owners.find(o=>o.id===item.ownerId)?.name||item.ownerId}</span>`:""}</div>`;
+      content.appendChild(card);
+    });
+  }
+
+  // USED INVENTORY
+  if(tab==="used"){
+    content.appendChild(el("p",{style:{color:"#475569",fontSize:"12px",fontWeight:"600",margin:"0 0 12px",textTransform:"uppercase",letterSpacing:".07em"}},isAdmin?"All Used Items":"Your Used Items"));
+    if(visUsedItems.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No used items yet"));
+    visUsedItems.forEach(item=>{
+      const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",border:"1px solid #374151"}});
+      card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#9ca3af;font-size:14px">${item.name}</div><div style="color:#64748b;font-size:11px;margin-top:2px;font-family:monospace">${item.barcode} · ${item.type}</div></div><span class="badge" style="background:#374151;color:#9ca3af">USED</span></div><div style="display:flex;gap:12px;margin-top:6px">${item.expDate?`<span style="color:#64748b;font-size:11px">Exp: ${item.expDate}</span>`:""}${isAdmin?`<span style="color:#64748b;font-size:11px">Used by: ${item.usedBy||"—"}</span>`:""}</div>`;
+      content.appendChild(card);
+    });
+  }
+
+  // ORDERS
+  if(tab==="orders"){
+    // Order QR creation handled via the Order button in the action bar
+    if(orders.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"20px"}},"No orders yet"));
+    orders.forEach(order=>{
+      const card=el("div",{class:"card"});
+      const statusColors={"transit":"#fbbf24","received":"#86efac","open":"#38bdf8"};
+      const statusBgs={"transit":"#78350f","received":"#14532d","open":"#0f172a"};
+      const st=order.status||"open";
+      const barcodes=(order.items||"").split(",").filter(b=>b.trim());
+      card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px;font-family:monospace">${order.id}</div><div style="color:#64748b;font-size:11px;margin-top:2px">Items: ${barcodes.length} · By: ${order.createdBy}</div></div><span class="badge" style="background:${statusBgs[st]||"#1e293b"};color:${statusColors[st]||"#64748b"}">${st.toUpperCase()}</span></div><div style="color:#64748b;font-size:11px;margin-top:6px">${order.createdAt?formatDate(order.createdAt):""}</div>`;
+      content.appendChild(card);
+    });
+  }
+
+  // LOG
+  if(tab==="log"){
+    const displayLog=isAdmin?S.log:S.log.filter(e=>e.user===user.username||e.from===owners.find(o=>o.id===user.ownerId)?.name||e.to===owners.find(o=>o.id===user.ownerId)?.name);
+    if(displayLog.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No activity yet"));
+    displayLog.forEach((entry,i)=>{
+      const colors={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1"};
+      const icons={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄"};
+      const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"11px 14px",marginBottom:"7px",border:"1px solid #1e293b",display:"flex",gap:"12px"}});
+      card.innerHTML=`<span style="font-size:20px">${icons[entry.action]||"📋"}</span><div style="flex:1"><div style="display:flex;justify-content:space-between"><span style="color:${colors[entry.action]||"#94a3b8"};font-weight:700;font-size:12px">${entry.action?.replace("_"," ")}</span><span style="color:#334155;font-size:11px">${entry.ts?formatDate(entry.ts):""}</span></div><div style="color:#f1f5f9;font-size:13px;margin-top:2px">${entry.itemName}</div><div style="display:flex;gap:10px;margin-top:3px"><span style="color:#64748b;font-size:11px;font-family:monospace">${entry.barcode}</span><span style="color:#475569;font-size:11px">by ${entry.user}</span></div>${entry.action==="TRANSFER"?`<div style="color:#818cf8;font-size:11px;margin-top:2px">${entry.from} → ${entry.to}</div>`:""}${entry.action==="CHECK_OUT"?`<div style="color:#fb923c;font-size:11px;margin-top:2px">from ${entry.from} → Used</div>`:""}${entry.action==="CHECK_IN"&&entry.from?.startsWith("ORD-")?`<div style="color:#818cf8;font-size:11px;margin-top:2px">Order: ${entry.from}</div>`:""}</div>`;
+      content.appendChild(card);
+    });
+  }
+
+  wrap.appendChild(content);
+  return wrap;
+}
+
+// ── SCANNER OVERLAY ───────────────────────────────────────────────────────────
+function renderScanner(){
+  const div=el("div",{style:{position:"fixed",inset:"0",background:"rgba(10,15,28,0.98)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:"800",gap:"14px",padding:"20px 16px"}});
+
+  // Show scanned count if in multi-scan mode
+  if(S.showMultiScan&&S.multiCodes.length>0){
+    const counter=el("div",{style:{background:"#0ea5e918",border:"1px solid #0ea5e933",borderRadius:"10px",padding:"10px 20px",textAlign:"center"}});
+    counter.innerHTML=`<span style="color:#38bdf8;font-weight:700;font-size:16px">📦 ${S.multiCodes.length} code${S.multiCodes.length>1?"s":""} scanned</span>`;
+    div.appendChild(counter);
+  }
+
+  const status=el("p",{id:"scan-status",style:{color:"#7dd3fc",fontSize:"13px",margin:"0",textAlign:"center",fontFamily:"monospace"}},S.showMultiScan?"Scan next code or tap Done":"Starting camera…");
+  div.appendChild(status);
+  const videoWrap=el("div",{style:{position:"relative",width:"100%",maxWidth:"320px",borderRadius:"16px",overflow:"hidden",border:"2px solid #0ea5e9"}});
+  const video=el("video",{id:"scan-video",autoplay:"",playsinline:"",muted:"",style:{width:"100%",display:"block",background:"#000",minHeight:"240px"}});
+  const canvas=el("canvas",{id:"scan-canvas",style:{display:"none"}});
+  const overlay=el("div",{style:{position:"absolute",inset:"0",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}});
+  const box=el("div",{style:{width:"160px",height:"160px",border:"3px solid #0ea5e9",borderRadius:"12px",boxShadow:"0 0 0 9999px rgba(0,0,0,0.5)"}});
+  overlay.appendChild(box);videoWrap.appendChild(video);videoWrap.appendChild(canvas);videoWrap.appendChild(overlay);
+  div.appendChild(videoWrap);
+
+
+
+  // Done button for order item scanning
+  if(S.showOrderItemScan){
+    const countBadge=document.createElement("div");
+    countBadge.style.cssText="background:#6366f118;border:1px solid #6366f133;border-radius:10px;padding:8px 16px;text-align:center;width:100%;max-width:320px;";
+    countBadge.innerHTML="<span style='color:#818cf8;font-weight:700;font-size:15px'>🗃 "+S.orderItems.length+" item"+(S.orderItems.length!==1?"s":"")+" added to order</span>";
+    div.appendChild(countBadge);
+    const doneBtn=el("button",{class:"btn btn-green",style:{maxWidth:"320px",marginTop:"4px"}},"Done Adding Items → Scan Order QR");
+    doneBtn.onclick=()=>{
+      if(S.orderItems.length===0){showToast("Scan at least one item","warn");return;}
+      stopScanner();
+      setState({scanning:true,showOrderItemScan:false,showOrderQRScan:true,scanHint:"Scan the Order QR code to finalize"});
+    };
+    div.appendChild(doneBtn);
+  }
+
+  // Done button for multi-scan
+  if(S.showMultiScan){
+    const doneBtn=el("button",{class:"btn btn-green",style:{maxWidth:"320px",marginTop:"4px"}},`Done Scanning (${S.multiCodes.length} codes)`);
+    doneBtn.onclick=()=>{stopScanner();setState({scanning:false,showMultiScan:false,showMultiConfirm:true});};
+    div.appendChild(doneBtn);
+  }
+
+  const cancelBtn=el("button",{style:{padding:"12px 32px",borderRadius:"9px",background:"transparent",color:"#94a3b8",border:"1px solid #334155",fontSize:"14px",width:"100%",maxWidth:"320px"}},"Cancel");
+  cancelBtn.onclick=()=>{stopScanner();setState({scanning:false,scanMode:null,multiMode:false,showMultiScan:false,multiCodes:[],multiDetails:null});};
+  div.appendChild(cancelBtn);
+  return div;
+}
+
+// ── SCAN MODE PROMPT ──────────────────────────────────────────────────────────
+function renderScanPrompt(){
+  const div=el("div",{class:"overlay-center"});
+  const card=el("div",{style:{width:"100%",maxWidth:"360px",background:"#111827",borderRadius:"20px",padding:"24px",border:"1px solid #1e293b"}});
+  card.innerHTML=`<h2 style="color:#f1f5f9;font-size:18px;font-weight:700;margin:0 0 6px;text-align:center">How many items?</h2><p style="color:#64748b;font-size:13px;text-align:center;margin:0 0 20px">Choose check-in mode</p>`;
+  [
+    ["single","1️⃣","Single Item","Scan one item","#22c55e"],
+    ["multi","📦","Multiple Items","Enter details once, scan all codes","#0ea5e9"],
+  ].forEach(([mode,icon,label,sub,color])=>{
+    const btn=el("button",{style:{width:"100%",padding:"14px 16px",borderRadius:"12px",border:`1px solid ${color}33`,background:`${color}18`,color,fontWeight:"700",fontSize:"15px",display:"flex",alignItems:"center",gap:"12px",marginBottom:"10px",textAlign:"left"}});
+    btn.innerHTML=`<span style="font-size:26px">${icon}</span><div><div>${label}</div><div style="font-size:11px;font-weight:400;opacity:.7;margin-top:2px">${sub}</div></div>`;
+    btn.onclick=()=>{
+      setState({showScanPrompt:false});
+      if(mode==="single")setState({multiMode:false,scanning:true,scanHint:"Point camera at QR code"});
+      else if(mode==="multi")setState({multiMode:true,multiCodes:[],multiDetails:null,showMultiDetails:true});
+    };
+    card.appendChild(btn);
+  });
+  const cancelBtn=el("button",{style:{width:"100%",padding:"12px",borderRadius:"9px",border:"1px solid #334155",background:"transparent",color:"#64748b",fontSize:"14px"}},"Cancel");
+  cancelBtn.onclick=()=>setState({showScanPrompt:false});
+  card.appendChild(cancelBtn);div.appendChild(card);return div;
+}
+
+// ── MULTI STEP 1: ENTER DETAILS ───────────────────────────────────────────────
+function renderMultiDetails(){
+  let name="",type="",expDate="";
+  const div=el("div",{class:"overlay"});
+  const inner=el("div",{class:"overlay-inner"});
+  const titleRow=el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}});
+  titleRow.innerHTML=`<h2 style="color:#f1f5f9;font-size:18px;font-weight:700;margin:0">Item Details</h2>`;
+  const closeBtn=el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"24px",cursor:"pointer"}},"✕");
+  closeBtn.onclick=()=>setState({showMultiDetails:false,multiMode:false,multiCodes:[],scanMode:null});
+  titleRow.appendChild(closeBtn);inner.appendChild(titleRow);
+  inner.appendChild(el("p",{style:{color:"#64748b",fontSize:"13px",margin:"0 0 20px"}},"Enter details once — they'll apply to all scanned items."));
+  // Item Name dropdown
+  const ln1=el("label",{class:"label"},"Item Name");
+  const sn1=el("select");
+  sn1.appendChild(el("option",{value:""},"Select item…"));
+  ["DFX","DFXM","BTFT","DTF-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT"].forEach(function(item){sn1.appendChild(el("option",{value:item},item));});
+  sn1.onchange=function(){name=this.value;};
+  inner.appendChild(ln1);inner.appendChild(sn1);inner.appendChild(el("div",{style:{height:"14px"}}));
+
+  // Equipment Type dropdown
+  const ln2=el("label",{class:"label"},"Equipment Type");
+  const sn2=el("select");
+  sn2.appendChild(el("option",{value:""},"Select type…"));
+  ["Disposable","Capital Equipment"].forEach(function(t){sn2.appendChild(el("option",{value:t},t));});
+  sn2.onchange=function(){type=this.value;};
+  inner.appendChild(ln2);inner.appendChild(sn2);inner.appendChild(el("div",{style:{height:"14px"}}));
+
+  // Expiration Date
+  const ln3=el("label",{class:"label"},"Expiration Date");
+  const in3=el("input",{type:"date"});
+  in3.oninput=function(){expDate=this.value;};
+  inner.appendChild(ln3);inner.appendChild(in3);inner.appendChild(el("div",{style:{height:"14px"}}));
+  inner.appendChild(el("div",{style:{height:"8px"}}));
+  const nextBtn=el("button",{class:"btn btn-green"},"Next — Scan QR Codes →");
+  nextBtn.onclick=()=>{
+    if(!name){showToast("Enter item name","warn");return;}
+    setState({showMultiDetails:false,showMultiScan:true,multiDetails:{name,type,expDate},scanning:true,scanHint:"Scan QR codes — tap Done when finished"});
+  };
+  inner.appendChild(nextBtn);
+  div.appendChild(inner);return div;
+}
+
+// ── MULTI STEP 2: SCAN CODES (handled in scanner overlay) ────────────────────
+
+// ── MULTI STEP 3: CONFIRM ─────────────────────────────────────────────────────
+function renderMultiConfirm(){
+  const {multiDetails,multiCodes}=S;
+  const div=el("div",{class:"overlay"});
+  const inner=el("div",{class:"overlay-inner"});
+  inner.innerHTML=`<h2 style="color:#f1f5f9;font-size:18px;font-weight:700;margin:0 0 16px">Confirm Check In</h2>`;
+
+  // Summary
+  const summary=el("div",{style:{background:"#0f172a",borderRadius:"10px",padding:"14px",marginBottom:"16px",border:"1px solid #1e293b"}});
+  summary.innerHTML=`<p style="color:#94a3b8;font-size:12px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Item Details</p><p style="color:#f1f5f9;font-size:15px;font-weight:700;margin:0 0 4px">${multiDetails.name}</p><p style="color:#64748b;font-size:13px;margin:0 0 2px">Type: ${multiDetails.type||"—"}</p><p style="color:#64748b;font-size:13px;margin:0">Exp: ${multiDetails.expDate||"—"}</p>`;
+  inner.appendChild(summary);
+
+  const countBadge=el("div",{style:{background:"#0ea5e918",border:"1px solid #0ea5e933",borderRadius:"10px",padding:"14px",marginBottom:"16px",textAlign:"center"}});
+  countBadge.innerHTML=`<div style="color:#38bdf8;font-size:32px;font-weight:800">${multiCodes.length}</div><div style="color:#7dd3fc;font-size:14px;margin-top:4px">item${multiCodes.length!==1?"s":""} to check in</div>`;
+  inner.appendChild(countBadge);
+
+  // List of codes
+  const codeList=el("div",{style:{background:"#0f172a",borderRadius:"10px",padding:"12px",marginBottom:"20px",maxHeight:"180px",overflowY:"auto"}});
+  codeList.innerHTML=`<p style="color:#94a3b8;font-size:11px;font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em">Scanned Codes</p>`;
+  multiCodes.forEach((code,i)=>{
+    const row=el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 0",borderBottom:i<multiCodes.length-1?"1px solid #1e293b":"none"}});
+    row.innerHTML=`<span style="color:#94a3b8;font-size:12px;font-family:monospace">${code}</span>`;
+    const removeBtn=el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"14px",cursor:"pointer",padding:"2px 6px"}},"✕");
+    removeBtn.onclick=()=>{const newCodes=S.multiCodes.filter(c=>c!==code);setState({multiCodes:newCodes});};
+    row.appendChild(removeBtn);codeList.appendChild(row);
+  });
+  inner.appendChild(codeList);
+
+  const pool=S.owners.find(o=>o.id==="POOL")||S.owners[0];
+  inner.appendChild(el("p",{style:{color:"#475569",fontSize:"12px",margin:"0 0 16px",textAlign:"center"}},`All items → 🏪 ${pool?.name||"General Pool"}`));
+
+  const confirmBtn=el("button",{class:"btn btn-green",style:{marginBottom:"10px"}},`✅ Confirm — Check In ${multiCodes.length} Item${multiCodes.length!==1?"s":""}`);
+  confirmBtn.onclick=submitMultiCheckin;
+  inner.appendChild(confirmBtn);
+
+  const backBtn=el("button",{class:"btn btn-dark",style:{marginBottom:"10px"}},"← Scan More Codes");
+  backBtn.onclick=()=>setState({showMultiConfirm:false,showMultiScan:true,scanning:true,scanHint:"Scan QR codes — tap Done when finished"});
+  inner.appendChild(backBtn);
+
+  const cancelBtn=el("button",{class:"btn",style:{background:"transparent",border:"1px solid #334155",color:"#64748b"}},"Cancel");
+  cancelBtn.onclick=()=>setState({showMultiConfirm:false,multiMode:false,multiCodes:[],multiDetails:null,scanMode:null});
+  inner.appendChild(cancelBtn);
+  div.appendChild(inner);return div;
+}
+
+// ── ORDER GEN ─────────────────────────────────────────────────────────────────
+function renderOrderGen(){
+  const div=el("div",{class:"overlay"});
+  const inner=el("div",{class:"overlay-inner"});
+  const titleRow=el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}});
+  titleRow.innerHTML=`<h2 style="color:#f1f5f9;font-size:18px;font-weight:700;margin:0">Create Order QR</h2>`;
+  const closeBtn=el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"24px",cursor:"pointer"}},"✕");
+  closeBtn.onclick=()=>{setState({showOrderGen:false});loadData();};
+  titleRow.appendChild(closeBtn);inner.appendChild(titleRow);
+  let orderName="",assignTo="";
+  const nameLabel=el("label",{class:"label"},"Order Name");
+  const nameInput=el("input",{type:"text",placeholder:"e.g. Shipment Jan 2026"});
+  nameInput.oninput=e=>orderName=e.target.value;
+  inner.appendChild(nameLabel);inner.appendChild(nameInput);inner.appendChild(el("div",{style:{height:"16px"}}));
+  const assignLabel=el("label",{class:"label"},"Assign Items To");
+  const assignSelect=el("select");
+  assignSelect.appendChild(el("option",{value:""},"Select owner…"));
+  S.owners.forEach(o=>{const icon=o.id==="POOL"?"🏪":o.id==="USED"?"🗑":o.type==="locker"?"🗄":"👤";assignSelect.appendChild(el("option",{value:o.id},`${icon} ${o.name}`));});
+  assignSelect.onchange=e=>assignTo=e.target.value;
+  inner.appendChild(assignLabel);inner.appendChild(assignSelect);inner.appendChild(el("div",{style:{height:"20px"}}));
+  const qrDiv=el("div",{id:"order-qr-result",style:{display:"none",textAlign:"center"}});
+  inner.appendChild(qrDiv);
+  const genBtn=el("button",{class:"btn btn-purple"},"Generate Order QR →");
+  genBtn.onclick=async()=>{
+    if(!orderName||!assignTo){showToast("Fill in all fields","warn");return;}
+    genBtn.textContent="Creating…";genBtn.disabled=true;
+    const orderId=`ORD-${Date.now()}`;
+    const now=new Date().toISOString();
+    try{
+      await sheetsAppend("Orders",[orderId,orderName,assignTo,now,S.user.username,"open",""]);
+      qrDiv.style.display="block";
+      qrDiv.innerHTML=`<p style="color:#4ade80;font-weight:700;margin:0 0 4px">✅ Order Created!</p><p style="color:#94a3b8;font-size:13px;margin:0 0 16px">${orderName}</p><div id="oqr" style="display:inline-block;background:#fff;padding:12px;border-radius:10px;margin-bottom:12px"></div><p style="color:#64748b;font-size:11px;font-family:monospace;margin:0 0 16px">${orderId}</p>`;
+      if(window.QRCode)new window.QRCode(document.getElementById("oqr"),{text:orderId,width:160,height:160});
+      const printBtn=el("button",{class:"btn btn-primary",style:{marginBottom:"10px"}},"🖨 Print QR Code");
+      printBtn.onclick=()=>{
+        const pa=document.getElementById("print-area");
+        pa.style.display="block";
+        pa.innerHTML=`<h2 style="font-family:sans-serif">${orderName}</h2><div>${document.getElementById("oqr").innerHTML}</div><p style="font-family:monospace;font-size:12px">${orderId}</p>`;
+        window.print();pa.style.display="none";
+      };
+      qrDiv.appendChild(printBtn);genBtn.style.display="none";showToast("Order created!");
+    }catch(e){showToast("Failed to create order","err");genBtn.textContent="Generate Order QR →";genBtn.disabled=false;}
+  };
+  inner.appendChild(genBtn);div.appendChild(inner);return div;
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+
+function renderTransferPage(modal,owners,user){
+  const item=modal.item;
+  const isAdmin=user.role==="admin";
+  const fromName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+  const userOwner=owners.find(o=>o.id===user.ownerId);
+
+  // Full page takeover - no overlay, no z-index issues
+  const page=document.createElement("div");
+  page.style.cssText="position:fixed;inset:0;background:#0a0f1c;z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+  
+  const inner=document.createElement("div");
+  inner.style.cssText="max-width:480px;margin:0 auto;padding:24px 20px;";
+
+  // Header
+  const hdr=document.createElement("div");
+  hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-top:8px;";
+  const title=document.createElement("h2");
+  title.style.cssText="color:#f1f5f9;font-size:20px;font-weight:700;margin:0;";
+  title.textContent="Transfer Item";
+  const xBtn=document.createElement("button");
+  xBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:18px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit;";
+  xBtn.textContent="✕ Cancel";
+  xBtn.onclick=function(){setState({modal:null});};
+  hdr.appendChild(title);hdr.appendChild(xBtn);
+  inner.appendChild(hdr);
+
+  // Item info card
+  const itemCard=document.createElement("div");
+  itemCard.style.cssText="background:#111827;border-radius:12px;border:1px solid #1e293b;padding:16px;margin-bottom:16px;";
+  itemCard.innerHTML="<div style='color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px'>Item</div>"
+    +"<div style='color:#f1f5f9;font-weight:700;font-size:16px;margin-bottom:4px'>"+item.name+"</div>"
+    +"<div style='color:#64748b;font-size:12px;font-family:monospace'>"+item.barcode+"</div>";
+  inner.appendChild(itemCard);
+
+  // From card
+  const fromCard=document.createElement("div");
+  fromCard.style.cssText="background:#0f172a;border-radius:12px;border:1px solid #334155;padding:16px;margin-bottom:16px;";
+  fromCard.innerHTML="<div style='color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px'>From</div>"
+    +"<div style='color:#38bdf8;font-weight:700;font-size:16px'>"+fromName+"</div>";
+  inner.appendChild(fromCard);
+
+  // To section
+  const toLabel=document.createElement("div");
+  toLabel.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;";
+  toLabel.textContent="Transfer To";
+  inner.appendChild(toLabel);
+
+  const validOwners=owners.filter(o=>o.id!==item.ownerId&&o.id!=="USED");
+  let destOwnerId=isAdmin?(validOwners[0]?.id||""):user.ownerId;
+
+  if(isAdmin){
+    const sel=document.createElement("select");
+    sel.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:14px;font-size:15px;margin-bottom:24px;font-family:inherit;box-sizing:border-box;";
+    validOwners.forEach(function(o){
+      const icon=o.id==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";
+      const opt=document.createElement("option");
+      opt.value=o.id;opt.textContent=icon+" "+o.name;
+      sel.appendChild(opt);
+    });
+    if(sel.options.length>0){sel.value=destOwnerId;}
+    sel.onchange=function(){destOwnerId=this.value;};
+    inner.appendChild(sel);
+  } else {
+    const destCard=document.createElement("div");
+    destCard.style.cssText="background:#0f172a;border-radius:12px;border:1px solid #0ea5e9;padding:16px;margin-bottom:24px;";
+    destCard.innerHTML="<div style='color:#38bdf8;font-weight:700;font-size:16px'>👤 "+(userOwner?.name||user.username)+"</div><div style='color:#475569;font-size:12px;margin-top:4px'>Your inventory</div>";
+    inner.appendChild(destCard);
+  }
+
+  // Big confirm button - native element, no wrapper
+  const confirmBtn=document.createElement("button");
+  confirmBtn.textContent="✓ Confirm Transfer";
+  confirmBtn.style.cssText="width:100%;padding:18px;border-radius:12px;border:none;background:#6366f1;color:#fff;font-weight:700;font-size:17px;cursor:pointer;display:block;font-family:inherit;margin-bottom:12px;-webkit-appearance:none;";
+  confirmBtn.onclick=function(){
+    const dest=destOwnerId;
+    if(!dest){showToast("Please select a destination","warn");return;}
+    if(dest===item.ownerId){showToast("Item is already in this inventory","warn");return;}
+    submitTransfer(item,dest);
+  };
+  inner.appendChild(confirmBtn);
+
+  const cancelBtn2=document.createElement("button");
+  cancelBtn2.textContent="Cancel";
+  cancelBtn2.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;-webkit-appearance:none;";
+  cancelBtn2.onclick=function(){setState({modal:null});};
+  inner.appendChild(cancelBtn2);
+
+  page.appendChild(inner);
+  return page;
+}
+
+function renderModal(){
+  const {modal,owners,user}=S;
+
+  if(modal.type==="transfer") return renderTransferPage(modal,owners,user);
+
+  const div=document.createElement("div");
+  div.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:flex-end;justify-content:center;z-index:500;";
+  div.onclick=function(e){if(e.target===div)setState({modal:null});};
+
+  const inner=document.createElement("div");
+  inner.style.cssText="width:100%;max-width:480px;background:#111827;border-radius:20px 20px 0 0;padding:24px 20px 48px;border:1px solid #1e293b;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+  inner.onclick=function(e){e.stopPropagation();};
+
+  if(modal.type==="checkin"){
+    const pool=owners.find(o=>o.id==="POOL")||owners[0];
+
+    const hdr=document.createElement("div");
+    hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";
+    const title=document.createElement("h2");
+    title.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";
+    title.textContent=modal.multi?"Item "+modal.num+" Details":"Check In Equipment";
+    const xBtn=document.createElement("button");
+    xBtn.style.cssText="background:none;border:none;color:#475569;font-size:24px;cursor:pointer;padding:4px 8px;";
+    xBtn.textContent="✕";
+    xBtn.onclick=function(){setState({modal:null});};
+    hdr.appendChild(title);hdr.appendChild(xBtn);
+    inner.appendChild(hdr);
+
+    if(modal.multi){
+      const note=document.createElement("div");
+      note.style.cssText="background:#0f172a;border-radius:8px;padding:8px 12px;margin-bottom:12px;color:#38bdf8;font-size:13px;";
+      note.textContent="📦 Multi-scan mode";
+      inner.appendChild(note);
+    }
+
+    const barcodeP=document.createElement("p");
+    barcodeP.style.cssText="color:#64748b;font-size:12px;font-family:monospace;margin:0 0 16px;";
+    barcodeP.textContent="Barcode: "+modal.barcode;
+    inner.appendChild(barcodeP);
+
+    let name="",type="",expDate="";
+
+    // Item Name
+    const n1=document.createElement("label");
+    n1.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+    n1.textContent="Item Name";
+    const i1=document.createElement("select");
+    i1.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";
+    const defOpt1=document.createElement("option");defOpt1.value="";defOpt1.textContent="Select item…";i1.appendChild(defOpt1);
+    ["DFX","DFXM","BTFT","DTF-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT"].forEach(function(item){
+      const o=document.createElement("option");o.value=item;o.textContent=item;i1.appendChild(o);
+    });
+    i1.onchange=function(){name=this.value;};
+    inner.appendChild(n1);inner.appendChild(i1);
+
+    // Equipment Type
+    const n2=document.createElement("label");
+    n2.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+    n2.textContent="Equipment Type";
+    const i2=document.createElement("select");
+    i2.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";
+    const defOpt=document.createElement("option");defOpt.value="";defOpt.textContent="Select type…";i2.appendChild(defOpt);
+    ["Disposable","Capital Equipment"].forEach(function(t){const o=document.createElement("option");o.value=t;o.textContent=t;i2.appendChild(o);});
+    i2.onchange=function(){type=this.value;};
+    inner.appendChild(n2);inner.appendChild(i2);
+
+    // Expiration Date
+    const n3=document.createElement("label");
+    n3.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+    n3.textContent="Expiration Date";
+    const i3=document.createElement("input");
+    i3.type="date";
+    i3.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;";
+    i3.oninput=function(){expDate=this.value;};
+    inner.appendChild(n3);inner.appendChild(i3);
+
+    // Assign To
+    const n4=document.createElement("label");
+    n4.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+    n4.textContent="Assign To";
+    const destBox=document.createElement("div");
+    destBox.style.cssText="padding:11px 14px;border-radius:9px;border:1px solid #334155;background:#0f172a;color:#38bdf8;font-size:15px;font-weight:600;margin-bottom:6px;";
+    destBox.textContent="🏪 "+(pool?.name||"General Pool");
+    const destNote=document.createElement("p");
+    destNote.style.cssText="color:#475569;font-size:11px;margin:0 0 20px;";
+    destNote.textContent="All items go to General Pool first.";
+    inner.appendChild(n4);inner.appendChild(destBox);inner.appendChild(destNote);
+
+    // Submit button
+    const submitBtn=document.createElement("button");
+    submitBtn.textContent=modal.multi?"Save & Scan Next ↗":"Confirm Check In";
+    submitBtn.style.cssText="width:100%;padding:16px;border-radius:10px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;-webkit-appearance:none;";
+    submitBtn.onclick=function(){
+      if(!name){showToast("Enter item name","warn");return;}
+      if(!pool){showToast("No pool found","err");return;}
+      setState({loading:true});
+      actionLock(()=>{
+      setState({modal:null,loading:false});
+      showToast("✅ "+name+" → "+(pool?.name||"Pool"));
+      submitCheckin(modal.barcode,name,type,expDate,pool.id)
+          .catch(function(e){console.error("Checkin write failed:",e);});
+    });
+    };
+    inner.appendChild(submitBtn);
+  }
+
+  if(modal.type==="checkout"){
+    const hdr=document.createElement("div");
+    hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";
+    const title=document.createElement("h2");
+    title.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";
+    title.textContent="Check Out Item";
+    const xBtn=document.createElement("button");
+    xBtn.style.cssText="background:none;border:none;color:#475569;font-size:24px;cursor:pointer;padding:4px 8px;";
+    xBtn.textContent="✕";xBtn.onclick=function(){setState({modal:null});};
+    hdr.appendChild(title);hdr.appendChild(xBtn);inner.appendChild(hdr);
+
+    const bodyP=document.createElement("p");
+    bodyP.style.cssText="color:#94a3b8;font-size:14px;margin-bottom:8px;";
+    bodyP.textContent="Check out and mark as Used:";
+    const nameP=document.createElement("p");
+    nameP.style.cssText="color:#f1f5f9;font-weight:700;font-size:16px;margin-bottom:4px;";
+    nameP.textContent=modal.item.name;
+    const bcP=document.createElement("p");
+    bcP.style.cssText="color:#64748b;font-size:12px;font-family:monospace;margin-bottom:24px;";
+    bcP.textContent=modal.item.barcode;
+    inner.appendChild(bodyP);inner.appendChild(nameP);inner.appendChild(bcP);
+
+    const confirmBtn=document.createElement("button");
+    confirmBtn.textContent="✅ Confirm — Move to Used";
+    confirmBtn.style.cssText="width:100%;padding:16px;border-radius:10px;border:none;background:#f59e0b;color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;-webkit-appearance:none;";
+    confirmBtn.onclick=function(){actionLock(()=>{confirmBtn.disabled=true;confirmBtn.textContent="Processing…";submitCheckout(modal.item);});};
+    inner.appendChild(confirmBtn);
+
+    const cancelBtn=document.createElement("button");
+    cancelBtn.textContent="Cancel";
+    cancelBtn.style.cssText="width:100%;padding:13px;border-radius:10px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:14px;cursor:pointer;display:block;font-family:inherit;-webkit-appearance:none;";
+    cancelBtn.onclick=function(){setState({modal:null});};
+    inner.appendChild(cancelBtn);
+  }
+
+  if(modal.type==="receive_order"){
+    const order=modal.order;
+    const barcodes=modal.barcodes;
+    const isAdmin=user.role==="admin";
+
+    const page=document.createElement("div");
+    page.style.cssText="position:fixed;inset:0;background:#0a0f1c;z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+    const inner2=document.createElement("div");
+    inner2.style.cssText="max-width:480px;margin:0 auto;padding:24px 20px;";
+
+    const hdr=document.createElement("div");
+    hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-top:8px;";
+    const title=document.createElement("h2");
+    title.style.cssText="color:#f1f5f9;font-size:20px;font-weight:700;margin:0;";
+    title.textContent="Receive Order";
+    const xBtn=document.createElement("button");
+    xBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:18px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit;";
+    xBtn.textContent="✕ Cancel";
+    xBtn.onclick=function(){setState({modal:null});};
+    hdr.appendChild(title);hdr.appendChild(xBtn);
+    inner2.appendChild(hdr);
+
+    // Order info
+    const infoCard=document.createElement("div");
+    infoCard.style.cssText="background:#111827;border-radius:12px;border:1px solid #6366f1;padding:16px;margin-bottom:16px;";
+    infoCard.innerHTML="<div style='color:#818cf8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px'>📦 Order QR</div>"
+      +"<div style='color:#f1f5f9;font-weight:700;font-size:15px;margin-bottom:4px;font-family:monospace'>"+order.id+"</div>"
+      +"<div style='color:#64748b;font-size:12px'>Created by: "+order.createdBy+"</div>";
+    inner2.appendChild(infoCard);
+
+    // Item count
+    const countCard=document.createElement("div");
+    countCard.style.cssText="background:#0ea5e918;border:1px solid #0ea5e933;border-radius:12px;padding:20px;margin-bottom:16px;text-align:center;";
+    countCard.innerHTML="<div style='color:#38bdf8;font-size:40px;font-weight:800'>"+barcodes.length+"</div>"
+      +"<div style='color:#7dd3fc;font-size:14px;margin-top:4px'>item"+(barcodes.length!==1?"s":"")+" will move to your inventory</div>";
+    inner2.appendChild(countCard);
+
+    // Destination - admin picks, user gets their own
+    let destOwnerId=isAdmin?"":user.ownerId;
+    if(isAdmin){
+      const toLabel=document.createElement("div");
+      toLabel.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;";
+      toLabel.textContent="Receive Into";
+      const validOwners=S.owners.filter(o=>o.id!=="TRANSIT"&&o.id!=="USED"&&o.id!=="POOL");
+      destOwnerId=validOwners[0]?.id||"";
+      const sel=document.createElement("select");
+      sel.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:14px;font-size:15px;margin-bottom:20px;font-family:inherit;box-sizing:border-box;";
+      validOwners.forEach(function(o){
+        const icon=o.type==="locker"?"🗄":"👤";
+        const opt=document.createElement("option");
+        opt.value=o.id;opt.textContent=icon+" "+o.name;
+        sel.appendChild(opt);
+      });
+      sel.value=destOwnerId;
+      sel.onchange=function(){destOwnerId=this.value;};
+      inner2.appendChild(toLabel);inner2.appendChild(sel);
+    } else {
+      const destCard=document.createElement("div");
+      destCard.style.cssText="background:#0f172a;border-radius:12px;border:1px solid #0ea5e9;padding:16px;margin-bottom:20px;";
+      const userOwner=S.owners.find(o=>o.id===user.ownerId);
+      destCard.innerHTML="<div style='color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px'>Receive Into</div>"
+        +"<div style='color:#38bdf8;font-weight:700;font-size:16px'>👤 "+(userOwner?.name||user.username)+"</div>";
+      inner2.appendChild(destCard);
+    }
+
+    const confirmBtn=document.createElement("button");
+    confirmBtn.textContent="✓ Confirm — Receive All Items";
+    confirmBtn.style.cssText="width:100%;padding:18px;border-radius:12px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:700;font-size:17px;cursor:pointer;display:block;font-family:inherit;margin-bottom:12px;";
+    confirmBtn.onclick=function(){
+      if(!destOwnerId){showToast("Select destination","warn");return;}
+      actionLock(()=>{confirmBtn.disabled=true;confirmBtn.textContent="Processing…";submitOrderReceive(order.id,destOwnerId);});
+    };
+    inner2.appendChild(confirmBtn);
+
+    const cancelBtn=document.createElement("button");
+    cancelBtn.textContent="Cancel";
+    cancelBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";
+    cancelBtn.onclick=function(){setState({modal:null});};
+    inner2.appendChild(cancelBtn);
+
+    page.appendChild(inner2);
+    return page;
+  }
+
+  div.appendChild(inner);return div;
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function renderToast(){
+  const {toast}=S;
+  const bg=toast.type==="err"?"#7f1d1d":toast.type==="warn"?"#78350f":"#14532d";
+  return el("div",{class:"toast",style:{background:bg}},toast.msg);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+// Unregister any cached service workers
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(regs=>{
+    regs.forEach(reg=>reg.unregister());
+  });
+}
+loadData();render();
+// Background sync every 60 seconds
+setInterval(()=>{ if(S.user&&!S.loading) loadData(); }, 60000);
+
+// Service worker disabled
+
+// ── PWA INSTALL PROMPT ─────────────────────────────────────────────────────────
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  showInstallBanner();
+});
+
+function showInstallBanner() {
+  if(document.getElementById('install-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'install-banner';
+  banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#111827;border-top:1px solid #1e293b;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;z-index:9999;';
+  banner.innerHTML = '<div><div style="color:#f1f5f9;font-weight:700;font-size:14px">Install InvTrack</div><div style="color:#64748b;font-size:12px">Add to your home screen</div></div>';
+  const btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:8px;';
+  const installBtn = document.createElement('button');
+  installBtn.textContent = 'Install';
+  installBtn.style.cssText = 'background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;';
+  installBtn.onclick = () => { if(deferredPrompt){ deferredPrompt.prompt(); deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; banner.remove(); }); } };
+  const dismissBtn = document.createElement('button');
+  dismissBtn.textContent = 'Later';
+  dismissBtn.style.cssText = 'background:transparent;color:#64748b;border:1px solid #334155;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;';
+  dismissBtn.onclick = () => banner.remove();
+  btns.appendChild(installBtn); btns.appendChild(dismissBtn);
+  banner.appendChild(btns);
+  document.body.appendChild(banner);
+}
+</script>
+</body>
+</html>
