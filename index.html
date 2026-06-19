@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606192131 -->
+<!DOCTYPE html><!-- InvTrack v202606192148 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -191,7 +191,7 @@ async function loadData(){
       items:iR.map(r=>({barcode:r[0],name:r[1],type:r[2],expDate:r[3],ownerId:r[4],status:r[5]||"active",addedAt:r[6],usedBy:r[7]||""})),
       log:lR.map(r=>({ts:r[0],action:r[1],barcode:r[2],itemName:r[3],from:r[4],to:r[5],user:r[6]})).reverse(),
       users:uR.map(r=>({username:r[0],password:r[1],role:r[2],ownerId:r[3]})),
-      orders:orR.map(r=>({id:r[0],count:r[1],createdBy:r[2],createdAt:r[3],status:r[4],items:r[5]||""})),
+      orders:orR.map(r=>({id:r[0],name:r[1],count:r[2],createdBy:r[3],createdAt:r[4],status:r[5],items:r[6]||""})),
       loading:false
     });
   }catch(e){showToast("Could not load data","err");setState({loading:false});}
@@ -260,13 +260,13 @@ async function submitTransfer(item,toOwnerId){
   }).catch(e=>console.error("Transfer write failed:",e));
 }
 
-async function submitOrderCreate(orderQR, itemBarcodes){
+async function submitOrderCreate(orderQR, itemBarcodes, orderName){
   const now=new Date().toISOString();
   const user=S.user.username;
   const poolName=S.owners.find(o=>o.id==="POOL")?.name||"Pool";
 
   // Optimistic UI — update local state immediately
-  const newOrder={id:orderQR,count:itemBarcodes.length,createdBy:user,createdAt:now,status:"transit",items:itemBarcodes.join(",")};
+  const newOrder={id:orderQR,name:orderName||orderQR,count:itemBarcodes.length,createdBy:user,createdAt:now,status:"transit",items:itemBarcodes.join(",")};
   const updatedItems=S.items.map(i=>itemBarcodes.includes(i.barcode)?{...i,status:"transit",ownerId:"TRANSIT"}:i);
   setState({
     loading:false,
@@ -281,7 +281,7 @@ async function submitOrderCreate(orderQR, itemBarcodes){
 
   // Write to sheet in background
   try{
-    sheetsAppend("Orders",[orderQR,itemBarcodes.length,user,now,"transit",itemBarcodes.join(",")]);
+    sheetsAppend("Orders",[orderQR,orderName||orderQR,itemBarcodes.length,user,now,"transit",itemBarcodes.join(",")]);
     // Get all item rows at once then update
     const allItems=await sheetsGet("Items!A2:H");
     for(const barcode of itemBarcodes){
@@ -510,6 +510,18 @@ function renderOrderSummary(){
   hdr.appendChild(title);hdr.appendChild(xBtn);
   inner.appendChild(hdr);
 
+  // Order Name input
+  let orderName = "";
+  const nameLabel=document.createElement("div");
+  nameLabel.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;";
+  nameLabel.textContent="Order Name";
+  const nameInput=document.createElement("input");
+  nameInput.type="text";
+  nameInput.placeholder="e.g. Shipment to Charlie, June Restock…";
+  nameInput.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:16px;box-sizing:border-box;";
+  nameInput.oninput=function(){orderName=this.value;};
+  inner.appendChild(nameLabel);inner.appendChild(nameInput);
+
   // Order QR
   const qrCard=document.createElement("div");
   qrCard.style.cssText="background:#6366f118;border:1px solid #6366f133;border-radius:12px;padding:16px;margin-bottom:16px;";
@@ -544,7 +556,9 @@ function renderOrderSummary(){
   const confirmBtn=document.createElement("button");
   confirmBtn.textContent="✓ Create Order & Move to Transit";
   confirmBtn.style.cssText="width:100%;padding:18px;border-radius:12px;border:none;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:700;font-size:17px;cursor:pointer;display:block;font-family:inherit;margin-bottom:12px;";
-  confirmBtn.onclick=function(){submitOrderCreate(pendingOrderQR,orderItems);};
+  confirmBtn.onclick=function(){
+    submitOrderCreate(pendingOrderQR,orderItems,orderName||pendingOrderQR);
+  };
   inner.appendChild(confirmBtn);
 
   const backBtn=document.createElement("button");
@@ -886,7 +900,7 @@ function renderApp(){
       const statusBgs={"transit":"#78350f","received":"#14532d","open":"#0f172a"};
       const st=order.status||"open";
       const barcodes=(order.items||"").split(",").filter(b=>b.trim());
-      card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px;font-family:monospace">${order.id}</div><div style="color:#64748b;font-size:11px;margin-top:2px">Items: ${barcodes.length} · By: ${order.createdBy}</div></div><span class="badge" style="background:${statusBgs[st]||"#1e293b"};color:${statusColors[st]||"#64748b"}">${st.toUpperCase()}</span></div><div style="color:#64748b;font-size:11px;margin-top:6px">${order.createdAt?formatDate(order.createdAt):""}</div>`;
+      card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">${order.name||order.id}</div><div style="color:#64748b;font-size:11px;font-family:monospace;margin-top:2px">${order.id}</div><div style="color:#64748b;font-size:11px;margin-top:2px">Items: ${barcodes.length} · By: ${order.createdBy}</div></div><span class="badge" style="background:${statusBgs[st]||"#1e293b"};color:${statusColors[st]||"#64748b"}">${st.toUpperCase()}</span></div><div style="color:#64748b;font-size:11px;margin-top:6px">${order.createdAt?formatDate(order.createdAt):""}</div>`;
       content.appendChild(card);
     });
   }
@@ -1374,8 +1388,9 @@ function renderModal(){
     // Order info
     const infoCard=document.createElement("div");
     infoCard.style.cssText="background:#111827;border-radius:12px;border:1px solid #6366f1;padding:16px;margin-bottom:16px;";
-    infoCard.innerHTML="<div style='color:#818cf8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px'>📦 Order QR</div>"
-      +"<div style='color:#f1f5f9;font-weight:700;font-size:15px;margin-bottom:4px;font-family:monospace'>"+order.id+"</div>"
+    infoCard.innerHTML="<div style='color:#818cf8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px'>📦 Order</div>"
+      +"<div style='color:#f1f5f9;font-weight:700;font-size:16px;margin-bottom:4px'>"+(order.name||order.id)+"</div>"
+      +"<div style='color:#64748b;font-size:12px;font-family:monospace;margin-bottom:4px'>"+order.id+"</div>"
       +"<div style='color:#64748b;font-size:12px'>Created by: "+order.createdBy+"</div>";
     inner2.appendChild(infoCard);
 
