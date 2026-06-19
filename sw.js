@@ -1,4 +1,4 @@
-const CACHE = 'invtrack-v2';
+const CACHE = 'invtrack-v202606191806';
 const ASSETS = [
   '/invtrack/',
   '/invtrack/index.html',
