@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606192148 -->
+<!DOCTYPE html><!-- InvTrack v202606192349-firestore2 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -19,6 +19,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAbN8qey649CWz9wb_iny5LiWveaUJ4_j4",
@@ -31,12 +32,41 @@
 
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
+    const db = getFirestore(firebaseApp);
 
-    // Expose to global scope for use in main script
+    // Expose Auth to global scope
     window.firebaseAuth = auth;
     window.firebaseSignIn = (email, password) => signInWithEmailAndPassword(auth, email, password);
     window.firebaseSignOut = () => signOut(auth);
     window.onAuthStateChanged = (callback) => onAuthStateChanged(auth, callback);
+
+    // Expose Firestore helpers to global scope
+    window.fsGetAll = async (collectionName) => {
+      const snap = await getDocs(collection(db, collectionName));
+      const results = [];
+      snap.forEach(d => results.push({ _id: d.id, ...d.data() }));
+      return results;
+    };
+
+    window.fsGetOne = async (collectionName, docId) => {
+      const snap = await getDoc(doc(db, collectionName, docId));
+      return snap.exists() ? { _id: snap.id, ...snap.data() } : null;
+    };
+
+    window.fsSet = async (collectionName, docId, data) => {
+      await setDoc(doc(db, collectionName, docId), data);
+      return true;
+    };
+
+    window.fsAdd = async (collectionName, data) => {
+      const ref = await addDoc(collection(db, collectionName), data);
+      return ref.id;
+    };
+
+    window.fsUpdate = async (collectionName, docId, data) => {
+      await updateDoc(doc(db, collectionName, docId), data);
+      return true;
+    };
   </script>
   <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
@@ -86,63 +116,73 @@ function formatDate(ts){
   }catch(e){return ts;}
 }
 
-const CFG = {
-  apiKey: "AIzaSyCJVuxBvNUHCsDcraEJ0qrHahYIWTfRAXs",
-  sheetId: "1enxSBlIjswSHakVHErSs49X-xBIa5D5p16evLjGdxCQ"
-};
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw2S-dgkuZMJ9NoSz9DaW7sp9zmdpq53JC9xoRV9aMR5VINnugcliok9lKINMyxbbkm4Q/exec";
+// ── FIRESTORE DATA LAYER ────────────────────────────────────────────────────
+// Replaces Google Sheets — all reads/writes go through Firestore now
 
-// No OAuth needed — uses Apps Script as backend
-
-async function sheetsGet(range){
-  const url="https://sheets.googleapis.com/v4/spreadsheets/"+CFG.sheetId+"/values/"+encodeURIComponent(range)+"?key="+CFG.apiKey;
-  const r=await fetch(url);
-  if(!r.ok)throw new Error("GET failed: "+r.status);
-  const d=await r.json();
-  return d.values||[];
+async function fsWaitForReady(){
+  let tries=0;
+  while(!window.fsGetAll && tries<100){
+    await new Promise(r=>setTimeout(r,100));
+    tries++;
+  }
+  if(!window.fsGetAll){
+    console.error("Firestore failed to load after 10 seconds");
+  }
 }
 
-async function sheetsAppend(sheet,row){
-  const r=await fetch(SCRIPT_URL,{
-    method:"POST",
-    headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify({action:"append",sheet:sheet,row:row})
-  });
-  if(!r.ok)throw new Error("HTTP error: "+r.status);
-  const d=await r.json();
-  if(!d.success)throw new Error(d.error||"Write failed");
-  return d;
+async function getItems(){
+  await fsWaitForReady();
+  return await window.fsGetAll("items");
 }
 
-async function sheetsAppendBatch(sheet,rows){
-  const r=await fetch(SCRIPT_URL,{
-    method:"POST",
-    headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify({action:"appendBatch",sheet:sheet,rows:rows})
-  });
-  if(!r.ok)throw new Error("HTTP error: "+r.status);
-  const d=await r.json();
-  if(!d.success)throw new Error(d.error||"Batch write failed");
-  return d;
+async function getOwners(){
+  await fsWaitForReady();
+  return await window.fsGetAll("owners");
 }
 
-async function sheetsUpdate(rowNum,values,sheet){
-  const r=await fetch(SCRIPT_URL,{
-    method:"POST",
-    headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify({action:"update",sheet:sheet||"Items",rowNum:rowNum,values:values})
-  });
-  if(!r.ok)throw new Error("HTTP error: "+r.status);
-  const d=await r.json();
-  if(!d.success)throw new Error(d.error||"Update failed");
-  return d;
+async function getUsers(){
+  await fsWaitForReady();
+  return await window.fsGetAll("users");
+}
+
+async function getOrders(){
+  await fsWaitForReady();
+  return await window.fsGetAll("orders");
+}
+
+async function getLog(){
+  await fsWaitForReady();
+  return await window.fsGetAll("log");
+}
+
+async function addItem(item){
+  await window.fsSet("items", item.barcode, item);
+}
+
+async function updateItem(barcode, data){
+  await window.fsUpdate("items", barcode, data);
+}
+
+async function addLog(entry){
+  await window.fsAdd("log", entry);
+}
+
+async function addOrder(order){
+  await window.fsSet("orders", order.id, order);
+}
+
+async function updateOrder(orderId, data){
+  await window.fsUpdate("orders", orderId, data);
 }
 
 async function findItemRow(barcode){
-  const values=await sheetsGet("Items!A2:H");
-  const idx=values.findIndex(r=>String(r[0])===String(barcode));
-  if(idx===-1)return null;
-  return{rowNum:idx+2,data:values[idx]};
+  const item = await window.fsGetOne("items", barcode);
+  if(!item) return null;
+  // Return in a format compatible with existing code: {rowNum, data: [barcode,name,type,expDate,ownerId,status,addedAt,usedBy]}
+  return {
+    rowNum: barcode, // Firestore uses doc ID instead of row number
+    data: [item.barcode, item.name, item.type, item.expDate, item.ownerId, item.status, item.addedAt, item.usedBy||""]
+  };
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -182,19 +222,18 @@ function showToast(msg,type="ok"){
 async function loadData(){
   setState({loading:true});
   try{
-    const [oR,iR,lR,uR,orR]=await Promise.all([
-      sheetsGet("Owners!A2:C"),sheetsGet("Items!A2:H"),
-      sheetsGet("Log!A2:G"),sheetsGet("Users!A2:D"),sheetsGet("Orders!A2:G")
+    const [owners,items,log,users,orders]=await Promise.all([
+      getOwners(),getItems(),getLog(),getUsers(),getOrders()
     ]);
     setState({
-      owners:oR.map(r=>({id:r[0],name:r[1],type:r[2]})),
-      items:iR.map(r=>({barcode:r[0],name:r[1],type:r[2],expDate:r[3],ownerId:r[4],status:r[5]||"active",addedAt:r[6],usedBy:r[7]||""})),
-      log:lR.map(r=>({ts:r[0],action:r[1],barcode:r[2],itemName:r[3],from:r[4],to:r[5],user:r[6]})).reverse(),
-      users:uR.map(r=>({username:r[0],password:r[1],role:r[2],ownerId:r[3]})),
-      orders:orR.map(r=>({id:r[0],name:r[1],count:r[2],createdBy:r[3],createdAt:r[4],status:r[5],items:r[6]||""})),
+      owners:owners.map(o=>({id:o._id,name:o.name,type:o.type})),
+      items:items.map(i=>({barcode:i._id,name:i.name,type:i.type,expDate:i.expDate,ownerId:i.ownerId,status:i.status||"active",addedAt:i.addedAt,usedBy:i.usedBy||""})),
+      log:log.map(l=>({ts:l.ts,action:l.action,barcode:l.barcode,itemName:l.itemName,from:l.from,to:l.to,user:l.user})).sort((a,b)=>new Date(b.ts)-new Date(a.ts)),
+      users:users.map(u=>({username:u._id,role:u.role,ownerId:u.ownerId||""})),
+      orders:orders.map(o=>({id:o._id,name:o.name,count:o.count,createdBy:o.createdBy,createdAt:o.createdAt,status:o.status,items:o.items||""})),
       loading:false
     });
-  }catch(e){showToast("Could not load data","err");setState({loading:false});}
+  }catch(e){console.error("Load failed:",e);showToast("Could not load data","err");setState({loading:false});}
 }
 
 // ── ACTIONS ───────────────────────────────────────────────────────────────────
@@ -205,9 +244,9 @@ async function submitCheckin(barcode,name,type,expDate,ownerId){
   // Optimistic UI — update local state immediately
   const newItem={barcode,name,type,expDate,ownerId,status:"active",addedAt:now,usedBy:""};
   setState({items:[...S.items,newItem]});
-  // Write to sheet in background
-  sheetsAppend("Items",[barcode,name,type,expDate,ownerId,"active",now,""]);
-  sheetsAppend("Log",[now,"CHECK_IN",barcode,name,orderRef,ownerName,S.user.username]);
+  // Write to Firestore in background
+  addItem(newItem);
+  addLog({ts:now,action:"CHECK_IN",barcode,itemName:name,from:orderRef,to:ownerName,user:S.user.username});
 }
 
 async function submitMultiCheckin(){
@@ -216,11 +255,11 @@ async function submitMultiCheckin(){
   const pool=owners.find(o=>o.id==="POOL")||owners[0];
   const now=new Date().toISOString();
   try{
-    // Batch all item rows in one call
-    const itemRows=multiCodes.map(barcode=>[barcode,multiDetails.name,multiDetails.type,multiDetails.expDate,pool.id,"active",now,""]);
-    const logRows=multiCodes.map(barcode=>[now,"CHECK_IN",barcode,multiDetails.name,"",pool.name,user.username]);
-    await sheetsAppendBatch("Items",itemRows);
-    await sheetsAppendBatch("Log",logRows);
+    // Write all items and logs to Firestore
+    for(const barcode of multiCodes){
+      await addItem({barcode,name:multiDetails.name,type:multiDetails.type,expDate:multiDetails.expDate,ownerId:pool.id,status:"active",addedAt:now,usedBy:""});
+      await addLog({ts:now,action:"CHECK_IN",barcode,itemName:multiDetails.name,from:"",to:pool.name,user:user.username});
+    }
     showToast(`✅ ${multiCodes.length} items checked in to ${pool.name}`);
     setState({multiMode:false,multiDetails:null,multiCodes:[],showMultiDetails:false,showMultiScan:false,showMultiConfirm:false,activeOrder:null,scanMode:null});
     await loadData();
@@ -228,18 +267,16 @@ async function submitMultiCheckin(){
 }
 
 async function submitCheckout(item){
-  setState({loading:true});
   const now=new Date().toISOString();
   const ownerName=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
-  try{
-    const foundC=await findItemRow(item.barcode);
-    if(foundC){const{rowNum,data}=foundC;await sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"","USED","used",data[6]||"",S.user.username]);}
-    await sheetsAppend("Log",[now,"CHECK_OUT",item.barcode,item.name,ownerName,"USED",S.user.username]);
-    showToast(`📤 ${item.name} → Used`);
-    setState({modal:null});
-
-    await loadData();
-  }catch(e){showToast("Write failed","err");setState({loading:false});}
+  // Optimistic UI
+  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,status:"used",ownerId:"USED",usedBy:S.user.username}:i);
+  setState({modal:null,loading:false,items:updatedItems});
+  showToast(`📤 ${item.name} → Used`);
+  // Write to Firestore in background
+  updateItem(item.barcode,{ownerId:"USED",status:"used",usedBy:S.user.username})
+    .then(()=>addLog({ts:now,action:"CHECK_OUT",barcode:item.barcode,itemName:item.name,from:ownerName,to:"USED",user:S.user.username}))
+    .catch(e=>{console.error("Checkout write failed:",e);showToast("Write failed: "+e.message,"err");});
 }
 
 async function submitTransfer(item,toOwnerId){
@@ -250,14 +287,10 @@ async function submitTransfer(item,toOwnerId){
   const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,ownerId:toOwnerId}:i);
   setState({modal:null,loading:false,items:updatedItems});
   showToast("🔄 "+item.name+" → "+toName);
-  // Write to sheet in background
-  findItemRow(item.barcode).then(found=>{
-    if(found){
-      const{rowNum,data}=found;
-      sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"",toOwnerId,data[5]||"active",data[6]||"",data[7]||""]);
-    }
-    sheetsAppend("Log",[now,"TRANSFER",item.barcode,item.name,fromName,toName,S.user.username]);
-  }).catch(e=>console.error("Transfer write failed:",e));
+  // Write to Firestore in background
+  updateItem(item.barcode,{ownerId:toOwnerId})
+    .then(()=>addLog({ts:now,action:"TRANSFER",barcode:item.barcode,itemName:item.name,from:fromName,to:toName,user:S.user.username}))
+    .catch(e=>console.error("Transfer write failed:",e));
 }
 
 async function submitOrderCreate(orderQR, itemBarcodes, orderName){
@@ -279,21 +312,13 @@ async function submitOrderCreate(orderQR, itemBarcodes, orderName){
   });
   showToast("📦 Order created! "+itemBarcodes.length+" items in transit");
 
-  // Write to sheet in background
+  // Write to Firestore in background
   try{
-    sheetsAppend("Orders",[orderQR,orderName||orderQR,itemBarcodes.length,user,now,"transit",itemBarcodes.join(",")]);
-    // Get all item rows at once then update
-    const allItems=await sheetsGet("Items!A2:H");
+    await addOrder(newOrder);
     for(const barcode of itemBarcodes){
-      const idx=allItems.findIndex(r=>String(r[0])===String(barcode));
-      if(idx!==-1){
-        const rowNum=idx+2;
-        const data=allItems[idx];
-        sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"","TRANSIT","transit",data[6]||"",data[7]||""]);
-      }
+      await updateItem(barcode,{ownerId:"TRANSIT",status:"transit"});
+      await addLog({ts:now,action:"ORDER_OUT",barcode,itemName:"",from:poolName,to:"TRANSIT",user});
     }
-    const logRows=itemBarcodes.map(b=>[now,"ORDER_OUT",b,"",poolName,"TRANSIT",user]);
-    sheetsAppendBatch("Log",logRows);
   }catch(e){
     console.error("Order create background write failed:",e);
   }
@@ -312,32 +337,16 @@ async function submitOrderReceive(orderQR, toOwnerId){
     if(!orderRow){showToast("Order not found","err");setState({loading:false});orderReceiveInProgress=false;return;}
     const barcodes=(orderRow.items||"").split(",").filter(b=>b.trim());
     if(barcodes.length===0){showToast("No items found in order","err");setState({loading:false});orderReceiveInProgress=false;return;}
-    
-    // Get all item rows at once
-    const allItems=await sheetsGet("Items!A2:H");
-    
-    // Build update requests for each barcode
+
+    // Update each item's owner in Firestore
     for(const barcode of barcodes){
-      const idx=allItems.findIndex(r=>String(r[0])===String(barcode));
-      if(idx!==-1){
-        const rowNum=idx+2;
-        const data=allItems[idx];
-        await sheetsUpdate(rowNum,[data[0]||"",data[1]||"",data[2]||"",data[3]||"",toOwnerId,"active",data[6]||"",data[7]||""]);
-      }
+      await updateItem(barcode,{ownerId:toOwnerId,status:"active"});
+      await addLog({ts:now,action:"ORDER_IN",barcode,itemName:"",from:"TRANSIT",to:toName,user});
     }
-    
-    // Batch log all items
-    const logRows=barcodes.map(b=>[now,"ORDER_IN",b,"","TRANSIT",toName,user]);
-    await sheetsAppendBatch("Log",logRows);
-    
-    // Update order status to received in Orders sheet
-    const ordersData=await sheetsGet("Orders!A2:F");
-    const oIdx=ordersData.findIndex(r=>String(r[0])===String(orderQR));
-    if(oIdx!==-1){
-      const oRow=ordersData[oIdx];
-      await sheetsUpdate(oIdx+2,[oRow[0]||"",oRow[1]||"",oRow[2]||"",oRow[3]||"","received",oRow[5]||""],"Orders");
-    }
-    
+
+    // Update order status to received
+    await updateOrder(orderQR,{status:"received"});
+
     showToast("✅ "+barcodes.length+" items received into "+toName);
     await loadData();
   }catch(e){
@@ -1114,7 +1123,7 @@ function renderOrderGen(){
     const orderId=`ORD-${Date.now()}`;
     const now=new Date().toISOString();
     try{
-      await sheetsAppend("Orders",[orderId,orderName,assignTo,now,S.user.username,"open",""]);
+      await addOrder({id:orderId,name:orderName,count:0,createdBy:S.user.username,createdAt:now,status:"open",items:""});
       qrDiv.style.display="block";
       qrDiv.innerHTML=`<p style="color:#4ade80;font-weight:700;margin:0 0 4px">✅ Order Created!</p><p style="color:#94a3b8;font-size:13px;margin:0 0 16px">${orderName}</p><div id="oqr" style="display:inline-block;background:#fff;padding:12px;border-radius:10px;margin-bottom:12px"></div><p style="color:#64748b;font-size:11px;font-family:monospace;margin:0 0 16px">${orderId}</p>`;
       if(window.QRCode)new window.QRCode(document.getElementById("oqr"),{text:orderId,width:160,height:160});
@@ -1465,7 +1474,9 @@ if('serviceWorker' in navigator){
     regs.forEach(reg=>reg.unregister());
   });
 }
-loadData();render();
+// Render login screen immediately, load data only after Firebase + login
+render();
+fsWaitForReady().then(()=>{ loadData(); });
 // Background sync every 60 seconds
 setInterval(()=>{ if(S.user&&!S.loading) loadData(); }, 60000);
 
