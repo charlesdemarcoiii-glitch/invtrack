@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606192036 -->
+<!DOCTYPE html><!-- InvTrack v202606192103 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -243,6 +243,8 @@ async function submitCheckout(item){
 }
 
 async function submitTransfer(item,toOwnerId){
+  if(transferInProgress) return;
+  transferInProgress = true;
   const now=new Date().toISOString();
   const fromName=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
   const toName=S.owners.find(o=>o.id===toOwnerId)?.name||toOwnerId;
@@ -299,6 +301,8 @@ async function submitOrderCreate(orderQR, itemBarcodes){
   }
 }
 
+let checkoutInProgress = false;
+let transferInProgress = false;
 let orderReceiveInProgress = false;
 async function submitOrderReceive(orderQR, toOwnerId){
   if(orderReceiveInProgress){return;}
@@ -1339,7 +1343,7 @@ function renderModal(){
     const confirmBtn=document.createElement("button");
     confirmBtn.textContent="✅ Confirm — Move to Used";
     confirmBtn.style.cssText="width:100%;padding:16px;border-radius:10px;border:none;background:#f59e0b;color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;-webkit-appearance:none;";
-    confirmBtn.onclick=function(){submitCheckout(modal.item);};
+    confirmBtn.onclick=function(){confirmBtn.disabled=true;confirmBtn.textContent="Processing…";submitCheckout(modal.item);};
     inner.appendChild(confirmBtn);
 
     const cancelBtn=document.createElement("button");
