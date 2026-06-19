@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606191810 -->
+<!DOCTYPE html><!-- InvTrack v202606191840 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -126,6 +126,8 @@ async function findItemRow(barcode){
 // ── STATE ─────────────────────────────────────────────────────────────────────
 const S = {
   user:null,users:[],owners:[],items:[],orders:[],log:[],
+  accounts:[],        // all signed-in accounts [{username,password,role,ownerId}]
+  showAccountMenu:false, // account switcher dropdown
   tab:"dashboard",loading:false,toast:null,toastTimer:null,
   scanning:false,scanMode:null,scanHint:"",
   modal:null,selectedOwner:null,
@@ -584,7 +586,12 @@ function renderLogin(){
   card.appendChild(loginBtn);
   function doLogin(){
     const u=S.users.find(u=>u.username.toLowerCase()===username.toLowerCase()&&u.password===password);
-    if(u)setState({user:u});
+    if(u){
+      // Add to accounts if not already there
+      const existing=S.accounts.find(a=>a.username.toLowerCase()===u.username.toLowerCase());
+      const accounts=existing?S.accounts:[...S.accounts,u];
+      setState({user:u,accounts,showAccountMenu:false});
+    }
     else errDiv.innerHTML=`<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ Incorrect username or password</p>`;
   }
   div.appendChild(card);return div;
@@ -610,13 +617,59 @@ function renderApp(){
   const header=el("div",{style:{background:"#111827",borderBottom:"1px solid #1e293b",padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:"0",zIndex:"100"}});
   const logo=el("div",{style:{display:"flex",alignItems:"center",gap:"10px"}});
   logo.innerHTML=`<span style="font-size:22px">📦</span><span style="font-weight:800;font-size:18px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent">InvTrack</span>`;
-  const hRight=el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}});
-  hRight.innerHTML=`<div style="text-align:right"><div style="color:#f1f5f9;font-size:13px;font-weight:700">${user.username}</div><div style="color:${isAdmin?"#818cf8":"#38bdf8"};font-size:10px;text-transform:uppercase;font-weight:600">${user.role}</div></div>`;
+  const hRight=el("div",{style:{display:"flex",alignItems:"center",gap:"8px",position:"relative"}});
+  
+  // Account switcher button
+  const acctBtn=el("button",{style:{background:"#1e293b",border:"1px solid #334155",borderRadius:"8px",padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:"6px"}});
+  acctBtn.innerHTML=`<div style="text-align:right"><div style="color:#f1f5f9;font-size:13px;font-weight:700">${user.username}</div><div style="color:${isAdmin?"#818cf8":"#38bdf8"};font-size:10px;text-transform:uppercase;font-weight:600">${user.role}</div></div><span style="color:#64748b;font-size:10px">▾</span>`;
+  acctBtn.onclick=()=>setState({showAccountMenu:!S.showAccountMenu});
+  hRight.appendChild(acctBtn);
+
+  // Account dropdown menu
+  if(S.showAccountMenu){
+    const menu=el("div",{style:{position:"absolute",top:"44px",right:"0",background:"#1e293b",border:"1px solid #334155",borderRadius:"12px",padding:"8px",zIndex:"1000",minWidth:"180px",boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}});
+    
+    // Signed in accounts
+    S.accounts.forEach(acct=>{
+      const isActive=acct.username===user.username;
+      const row=el("button",{style:{width:"100%",padding:"10px 12px",borderRadius:"8px",border:"none",background:isActive?"#0ea5e918":"transparent",color:isActive?"#38bdf8":"#f1f5f9",fontWeight:isActive?"700":"400",fontSize:"13px",display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",marginBottom:"2px",textAlign:"left"}});
+      row.innerHTML=`<span style="font-size:16px">${acct.role==="admin"?"👑":"👤"}</span><div><div>${acct.username}</div><div style="font-size:10px;color:${isActive?"#38bdf8":"#64748b"};text-transform:uppercase">${acct.role}${isActive?" · Active":""}</div></div>`;
+      if(!isActive){
+        row.onclick=()=>{setState({user:acct,tab:"dashboard",showAccountMenu:false});};
+      }
+      menu.appendChild(row);
+    });
+
+    // Divider
+    menu.appendChild(el("div",{style:{height:"1px",background:"#334155",margin:"6px 0"}}));
+
+    // Add account button
+    const addBtn=el("button",{style:{width:"100%",padding:"10px 12px",borderRadius:"8px",border:"none",background:"transparent",color:"#22c55e",fontSize:"13px",fontWeight:"600",display:"flex",alignItems:"center",gap:"8px",cursor:"pointer"}});
+    addBtn.innerHTML=`<span>＋</span> Add Account`;
+    addBtn.onclick=()=>setState({user:null,showAccountMenu:false});
+    menu.appendChild(addBtn);
+
+    // Sign out all
+    const outAllBtn=el("button",{style:{width:"100%",padding:"10px 12px",borderRadius:"8px",border:"none",background:"transparent",color:"#f87171",fontSize:"13px",fontWeight:"600",display:"flex",alignItems:"center",gap:"8px",cursor:"pointer"}});
+    outAllBtn.innerHTML=`<span>⇥</span> Sign Out All`;
+    outAllBtn.onclick=()=>setState({user:null,accounts:[],showAccountMenu:false,tab:"dashboard"});
+    menu.appendChild(outAllBtn);
+
+    hRight.appendChild(menu);
+    // Close menu when clicking outside
+    setTimeout(()=>{
+      document.addEventListener("click",function closeMenu(e){
+        if(!acctBtn.contains(e.target)&&!menu.contains(e.target)){
+          setState({showAccountMenu:false});
+          document.removeEventListener("click",closeMenu);
+        }
+      });
+    },0);
+  }
+
   const syncBtn=el("button",{style:{padding:"8px 10px",borderRadius:"8px",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:"14px"}},"⟳");
   syncBtn.onclick=loadData;
-  const outBtn=el("button",{style:{padding:"8px 10px",borderRadius:"8px",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:"12px"}},"Out");
-  outBtn.onclick=()=>setState({user:null,tab:"dashboard"});
-  hRight.appendChild(syncBtn);hRight.appendChild(outBtn);
+  hRight.appendChild(syncBtn);
   header.appendChild(logo);header.appendChild(hRight);
   wrap.appendChild(header);
 
