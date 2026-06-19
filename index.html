@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606191800 -->
+<!DOCTYPE html><!-- InvTrack v202606191810 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1345,18 +1345,17 @@ function renderToast(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
+// Unregister any cached service workers
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(regs=>{
+    regs.forEach(reg=>reg.unregister());
+  });
+}
 loadData();render();
 // Background sync every 60 seconds
 setInterval(()=>{ if(S.user&&!S.loading) loadData(); }, 60000);
 
-// ── SERVICE WORKER ─────────────────────────────────────────────────────────────
-if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('SW registered'))
-      .catch(err => console.log('SW failed', err));
-  });
-}
+// Service worker disabled
 
 // ── PWA INSTALL PROMPT ─────────────────────────────────────────────────────────
 let deferredPrompt = null;
