@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAbN8qey649CWz9wb_iny5LiWveaUJ4_j4",
+  authDomain: "invtrack-bbe0e.firebaseapp.com",
+  projectId: "invtrack-bbe0e",
+  storageBucket: "invtrack-bbe0e.firebasestorage.app",
+  messagingSenderId: "501870517081",
+  appId: "1:501870517081:web:592f87f1633f3045b00a48"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+const owners = [
+  {id:"Pool",name:"Unclaimed Inventory",type:"locker"},
+  {id:"P001",name:"Charlie Jr.",type:"person"},
+  {id:"P002",name:"Kyle",type:"person"},
+  {id:"P003",name:"Damian",type:"person"},
+  {id:"L001",name:"Office Locker",type:"locker"},
+  {id:"USED",name:"Used Items",type:"locker"},
+  {id:"TRANSIT",name:"In Transit",type:"locker"}
+];
+
+const items = [
+  {barcode:"test-024",name:"DFX",type:"Disposable",expDate:"2028-06-19T04:00:00.000Z",ownerId:"P001",status:"active",addedAt:"2026-06-19T21:52:59.068Z",usedBy:""}
+];
+
+const users = [
+  {email:"healthnowinventory@gmail.com",role:"admin",ownerId:""},
+  {email:"kyle.dkpmedicalsolutions@gmail.com",role:"user",ownerId:"P002"},
+  {email:"charlesdemarcoiii@gmail.com",role:"user",ownerId:"P001"},
+  {email:"dpgarrubbo@pm.me",role:"user",ownerId:"P003"}
+];
+
+const orders = [
+  {id:"test-030",name:"To Rob",count:1,createdBy:"healthnowinventory@gmail.com",status:"received",items:"transit"}
+];
+
+window.runMigration = async function(email, password) {
+  const log = document.getElementById('log');
+  log.innerHTML += "Signing in...<br>";
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    log.innerHTML += "✅ Signed in<br>";
+  } catch(e) {
+    log.innerHTML += "❌ Sign in failed: " + e.message + "<br>";
+    return;
+  }
+
+  log.innerHTML += "Migrating owners...<br>";
+  for (const o of owners) {
+    await setDoc(doc(db, "owners", o.id), o);
+    log.innerHTML += "  ✓ " + o.name + "<br>";
+  }
+
+  log.innerHTML += "Migrating items...<br>";
+  for (const i of items) {
+    await setDoc(doc(db, "items", i.barcode), i);
+    log.innerHTML += "  ✓ " + i.barcode + "<br>";
+  }
+
+  log.innerHTML += "Migrating users...<br>";
+  for (const u of users) {
+    await setDoc(doc(db, "users", u.email), u);
+    log.innerHTML += "  ✓ " + u.email + "<br>";
+  }
+
+  log.innerHTML += "Migrating orders...<br>";
+  for (const o of orders) {
+    await setDoc(doc(db, "orders", o.id), o);
+    log.innerHTML += "  ✓ " + o.id + "<br>";
+  }
+
+  log.innerHTML += "<br>🎉 Migration complete!";
+};
+</script>
+</head>
+<body style="font-family:sans-serif;padding:40px;background:#0a0f1c;color:#fff;">
+<h1>InvTrack → Firestore Migration</h1>
+<p>Enter your admin email and password to run the migration:</p>
+<input id="email" type="email" placeholder="Admin email" style="padding:10px;width:300px;display:block;margin-bottom:10px;">
+<input id="password" type="password" placeholder="Password" style="padding:10px;width:300px;display:block;margin-bottom:10px;">
+<button onclick="runMigration(document.getElementById('email').value, document.getElementById('password').value)" style="padding:10px 20px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;cursor:pointer;">Run Migration</button>
+<div id="log" style="margin-top:20px;font-family:monospace;font-size:13px;"></div>
+</body>
+</html>
