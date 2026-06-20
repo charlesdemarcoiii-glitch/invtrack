@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606200120-resilient -->
+<!DOCTYPE html><!-- InvTrack v202606200130-loginfix -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -142,21 +142,28 @@ async function getOwners(){
 
 async function getUsers(){
   await fsWaitForReady();
-  // Regular users can only read their own record per security rules
-  // Admins can read all users
-  if(S.user && S.user.role==="admin"){
+  if(!S.user || !S.user.email) return [];
+
+  // Always fetch own record first — this is always allowed per security rules
+  let ownRecord = null;
+  try{
+    ownRecord = await window.fsGetOne("users", S.user.email);
+  }catch(e){
+    console.error("Could not load own user record:",e);
+  }
+
+  const isAdmin = ownRecord && ownRecord.role==="admin";
+
+  if(isAdmin){
     try{
-      return await window.fsGetAll("users");
+      const all = await window.fsGetAll("users");
+      return all.length>0 ? all : (ownRecord?[ownRecord]:[]);
     }catch(e){
       console.warn("Could not load all users, falling back to own record:",e);
     }
   }
-  // Fallback: just get the current user's own record
-  if(S.user && S.user.email){
-    const own = await window.fsGetOne("users", S.user.email);
-    return own ? [own] : [];
-  }
-  return [];
+
+  return ownRecord ? [ownRecord] : [];
 }
 
 async function getOrders(){
@@ -665,19 +672,22 @@ function renderLogin(){
     loginBtn.textContent="Signing in…";loginBtn.disabled=true;
     if(!window.firebaseSignIn){errDiv.innerHTML=`<p style="color:#f87171;font-size:13px;text-align:center;margin:8px 0 0">⚠ Auth not loaded yet, try again</p>`;loginBtn.textContent="Sign In →";loginBtn.disabled=false;return;}
     window.firebaseSignIn(email,password)
-      .then(cred=>{
+      .then(async cred=>{
         const firebaseEmail=cred.user.email;
-        // Match Firebase email to Users sheet row
-        const u=S.users.find(u=>u.username.toLowerCase()===firebaseEmail.toLowerCase()||u.email&&u.email.toLowerCase()===firebaseEmail.toLowerCase());
-        if(u){
-          const existing=S.accounts.find(a=>a.username.toLowerCase()===(u.username||firebaseEmail).toLowerCase());
-          const accounts=existing?S.accounts:[...S.accounts,{...u,email:firebaseEmail}];
-          setState({user:{...u,email:firebaseEmail,username:u.username||firebaseEmail},accounts,showAccountMenu:false});
-        } else {
-          // Use Firebase email as username, default to user role
-          const newUser={username:firebaseEmail,email:firebaseEmail,role:"user",ownerId:""};
-          setState({user:newUser,accounts:[...S.accounts,newUser],showAccountMenu:false});
+        await fsWaitForReady();
+        // Fetch the user's own record directly from Firestore (always allowed by security rules)
+        let userRecord=null;
+        try{
+          userRecord=await window.fsGetOne("users",firebaseEmail);
+        }catch(e){
+          console.error("Could not fetch user record:",e);
         }
+        const u = userRecord
+          ? {username:firebaseEmail,email:firebaseEmail,role:userRecord.role||"user",ownerId:userRecord.ownerId||""}
+          : {username:firebaseEmail,email:firebaseEmail,role:"user",ownerId:""};
+        const existing=S.accounts.find(a=>a.username.toLowerCase()===u.username.toLowerCase());
+        const accounts=existing?S.accounts:[...S.accounts,u];
+        setState({user:u,accounts,showAccountMenu:false});
       })
       .catch(err=>{
         let msg="Incorrect email or password";
