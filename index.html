@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606200001-poolfix2 -->
+<!DOCTYPE html><!-- InvTrack v202606200120-resilient -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -142,7 +142,21 @@ async function getOwners(){
 
 async function getUsers(){
   await fsWaitForReady();
-  return await window.fsGetAll("users");
+  // Regular users can only read their own record per security rules
+  // Admins can read all users
+  if(S.user && S.user.role==="admin"){
+    try{
+      return await window.fsGetAll("users");
+    }catch(e){
+      console.warn("Could not load all users, falling back to own record:",e);
+    }
+  }
+  // Fallback: just get the current user's own record
+  if(S.user && S.user.email){
+    const own = await window.fsGetOne("users", S.user.email);
+    return own ? [own] : [];
+  }
+  return [];
 }
 
 async function getOrders(){
@@ -222,15 +236,27 @@ function showToast(msg,type="ok"){
 async function loadData(){
   setState({loading:true});
   try{
-    const [owners,items,log,users,orders]=await Promise.all([
+    const [ownersR,itemsR,logR,usersR,ordersR]=await Promise.allSettled([
       getOwners(),getItems(),getLog(),getUsers(),getOrders()
     ]);
+    const owners = ownersR.status==="fulfilled" ? ownersR.value : S.owners;
+    const items = itemsR.status==="fulfilled" ? itemsR.value : S.items.map(i=>({_id:i.barcode,...i}));
+    const log = logR.status==="fulfilled" ? logR.value : [];
+    const users = usersR.status==="fulfilled" ? usersR.value : S.users.map(u=>({_id:u.username,...u}));
+    const orders = ordersR.status==="fulfilled" ? ordersR.value : S.orders.map(o=>({_id:o.id,...o}));
+
+    if(ownersR.status==="rejected")console.error("Owners load failed:",ownersR.reason);
+    if(itemsR.status==="rejected")console.error("Items load failed:",itemsR.reason);
+    if(logR.status==="rejected")console.error("Log load failed:",logR.reason);
+    if(usersR.status==="rejected")console.error("Users load failed:",usersR.reason);
+    if(ordersR.status==="rejected")console.error("Orders load failed:",ordersR.reason);
+
     setState({
-      owners:owners.map(o=>({id:o._id,name:o.name,type:o.type})),
-      items:items.map(i=>({barcode:i._id,name:i.name,type:i.type,expDate:i.expDate,ownerId:i.ownerId,status:i.status||"active",addedAt:i.addedAt,usedBy:i.usedBy||""})),
+      owners:owners.map(o=>({id:o._id||o.id,name:o.name,type:o.type})),
+      items:items.map(i=>({barcode:i._id||i.barcode,name:i.name,type:i.type,expDate:i.expDate,ownerId:i.ownerId,status:i.status||"active",addedAt:i.addedAt,usedBy:i.usedBy||""})),
       log:log.map(l=>({ts:l.ts,action:l.action,barcode:l.barcode,itemName:l.itemName,from:l.from,to:l.to,user:l.user})).sort((a,b)=>new Date(b.ts)-new Date(a.ts)),
-      users:users.map(u=>({username:u._id,role:u.role,ownerId:u.ownerId||""})),
-      orders:orders.map(o=>({id:o._id,name:o.name,count:o.count,createdBy:o.createdBy,createdAt:o.createdAt,status:o.status,items:o.items||""})),
+      users:users.map(u=>({username:u._id||u.username,role:u.role,ownerId:u.ownerId||""})),
+      orders:orders.map(o=>({id:o._id||o.id,name:o.name,count:o.count,createdBy:o.createdBy,createdAt:o.createdAt,status:o.status,items:o.items||""})),
       loading:false
     });
   }catch(e){console.error("Load failed:",e);showToast("Could not load data","err");setState({loading:false});}
