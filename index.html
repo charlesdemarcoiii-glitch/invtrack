@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606192349-firestore2 -->
+<!DOCTYPE html><!-- InvTrack v202606200001-poolfix2 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -252,7 +252,7 @@ async function submitCheckin(barcode,name,type,expDate,ownerId){
 async function submitMultiCheckin(){
   const {multiDetails,multiCodes,user,owners,activeOrder}=S;
   setState({loading:true,showMultiConfirm:false});
-  const pool=owners.find(o=>o.id==="POOL")||owners[0];
+  const pool=owners.find(o=>o.id.toUpperCase()==="POOL")||owners[0];
   const now=new Date().toISOString();
   try{
     // Write all items and logs to Firestore
@@ -296,7 +296,7 @@ async function submitTransfer(item,toOwnerId){
 async function submitOrderCreate(orderQR, itemBarcodes, orderName){
   const now=new Date().toISOString();
   const user=S.user.username;
-  const poolName=S.owners.find(o=>o.id==="POOL")?.name||"Pool";
+  const poolName=S.owners.find(o=>o.id.toUpperCase()==="POOL")?.name||"Pool";
 
   // Optimistic UI — update local state immediately
   const newOrder={id:orderQR,name:orderName||orderQR,count:itemBarcodes.length,createdBy:user,createdAt:now,status:"transit",items:itemBarcodes.join(",")};
@@ -813,7 +813,7 @@ function renderApp(){
       const oi=activeItems.filter(i=>i.ownerId===owner.id);
       const oe=oi.filter(i=>i.expDate&&new Date(i.expDate)<new Date());
       const card=el("div",{class:"card",style:{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}});
-      const icon=owner.id==="POOL"?"🏪":owner.type==="locker"?"🗄":"👤";
+      const icon=owner.id.toUpperCase()==="POOL"?"🏪":owner.type==="locker"?"🗄":"👤";
       card.innerHTML=`<div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">${icon}</span><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">${owner.name}</div><div style="color:#64748b;font-size:11px">${owner.type}</div></div></div><div style="text-align:right"><div style="font-weight:700;color:#38bdf8;font-size:20px">${oi.length}</div>${oe.length>0?`<div style="color:#ef4444;font-size:11px">${oe.length} exp</div>`:""}</div>`;
       card.onclick=()=>setState({selectedOwner:owner,tab:"inventory"});
       content.appendChild(card);
@@ -828,7 +828,7 @@ function renderApp(){
       allBtn.onclick=()=>setState({selectedOwner:null});
       filters.appendChild(allBtn);
       owners.filter(o=>o.id!=="USED").forEach(o=>{
-        const icon=o.id==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";
+        const icon=o.id.toUpperCase()==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";
         const btn=el("button",{style:{padding:"7px 14px",borderRadius:"7px",border:"1px solid #334155",background:selectedOwner?.id===o.id?"#0ea5e9":"#1e293b",color:selectedOwner?.id===o.id?"#fff":"#94a3b8",fontSize:"13px",fontWeight:"600"}},`${icon} ${o.name}`);
         btn.onclick=()=>setState({selectedOwner:o});
         filters.appendChild(btn);
@@ -1077,7 +1077,7 @@ function renderMultiConfirm(){
   });
   inner.appendChild(codeList);
 
-  const pool=S.owners.find(o=>o.id==="POOL")||S.owners[0];
+  const pool=S.owners.find(o=>o.id.toUpperCase()==="POOL")||S.owners[0];
   inner.appendChild(el("p",{style:{color:"#475569",fontSize:"12px",margin:"0 0 16px",textAlign:"center"}},`All items → 🏪 ${pool?.name||"General Pool"}`));
 
   const confirmBtn=el("button",{class:"btn btn-green",style:{marginBottom:"10px"}},`✅ Confirm — Check In ${multiCodes.length} Item${multiCodes.length!==1?"s":""}`);
@@ -1111,7 +1111,7 @@ function renderOrderGen(){
   const assignLabel=el("label",{class:"label"},"Assign Items To");
   const assignSelect=el("select");
   assignSelect.appendChild(el("option",{value:""},"Select owner…"));
-  S.owners.forEach(o=>{const icon=o.id==="POOL"?"🏪":o.id==="USED"?"🗑":o.type==="locker"?"🗄":"👤";assignSelect.appendChild(el("option",{value:o.id},`${icon} ${o.name}`));});
+  S.owners.forEach(o=>{const icon=o.id.toUpperCase()==="POOL"?"🏪":o.id==="USED"?"🗑":o.type==="locker"?"🗄":"👤";assignSelect.appendChild(el("option",{value:o.id},`${icon} ${o.name}`));});
   assignSelect.onchange=e=>assignTo=e.target.value;
   inner.appendChild(assignLabel);inner.appendChild(assignSelect);inner.appendChild(el("div",{style:{height:"20px"}}));
   const qrDiv=el("div",{id:"order-qr-result",style:{display:"none",textAlign:"center"}});
@@ -1196,7 +1196,7 @@ function renderTransferPage(modal,owners,user){
     const sel=document.createElement("select");
     sel.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:14px;font-size:15px;margin-bottom:24px;font-family:inherit;box-sizing:border-box;";
     validOwners.forEach(function(o){
-      const icon=o.id==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";
+      const icon=o.id.toUpperCase()==="POOL"?"🏪":o.type==="locker"?"🗄":"👤";
       const opt=document.createElement("option");
       opt.value=o.id;opt.textContent=icon+" "+o.name;
       sel.appendChild(opt);
@@ -1247,7 +1247,7 @@ function renderModal(){
   inner.onclick=function(e){e.stopPropagation();};
 
   if(modal.type==="checkin"){
-    const pool=owners.find(o=>o.id==="POOL")||owners[0];
+    const pool=owners.find(o=>o.id.toUpperCase()==="POOL")||owners[0];
 
     const hdr=document.createElement("div");
     hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";
@@ -1416,7 +1416,7 @@ function renderModal(){
       const toLabel=document.createElement("div");
       toLabel.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;";
       toLabel.textContent="Receive Into";
-      const validOwners=S.owners.filter(o=>o.id!=="TRANSIT"&&o.id!=="USED"&&o.id!=="POOL");
+      const validOwners=S.owners.filter(o=>o.id.toUpperCase()!=="TRANSIT"&&o.id.toUpperCase()!=="USED"&&o.id.toUpperCase()!=="POOL");
       destOwnerId=validOwners[0]?.id||"";
       const sel=document.createElement("select");
       sel.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:14px;font-size:15px;margin-bottom:20px;font-family:inherit;box-sizing:border-box;";
