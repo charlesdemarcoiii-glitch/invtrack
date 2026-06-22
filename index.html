@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606221847 -->
+<!DOCTYPE html><!-- InvTrack v202606221854-revert -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -872,30 +872,21 @@ function renderApp(){
       });
       content.appendChild(filters);
     }
-    // Search bar — uses local variable, NOT setState, to avoid re-render on each keystroke
-    let searchTerm=S.inventorySearch||"";
+    // Search bar
     const searchWrap=document.createElement("div");
     searchWrap.style.cssText="position:relative;margin-bottom:12px;";
     const searchInput=document.createElement("input");
     searchInput.type="text";
     searchInput.placeholder="🔍  Search by name or barcode…";
     searchInput.style.cssText="width:100%;box-sizing:border-box;";
-    searchInput.value=searchTerm;
-    const itemListDiv=document.createElement("div");
-    searchInput.oninput=function(){
-      searchTerm=this.value.toLowerCase().trim();
-      S.inventorySearch=this.value; // store without triggering re-render
-      renderItemList(searchTerm);
-    };
+    searchInput.value=S.inventorySearch||"";
+    searchInput.oninput=function(){setState({inventorySearch:this.value});};
     searchWrap.appendChild(searchInput);
     content.appendChild(searchWrap);
-    content.appendChild(itemListDiv);
 
+    const searchTerm=(S.inventorySearch||"").toLowerCase().trim();
     const baseItems=isAdmin?(selectedOwner?activeItems.filter(i=>i.ownerId===selectedOwner.id):activeItems):visActiveItems;
-
-    function renderItemList(term){
-      itemListDiv.innerHTML="";
-      const displayItems=term?baseItems.filter(i=>i.name.toLowerCase().includes(term)||i.barcode.toLowerCase().includes(term)):baseItems;
+    const displayItems=searchTerm?baseItems.filter(i=>i.name.toLowerCase().includes(searchTerm)||i.barcode.toLowerCase().includes(searchTerm)):baseItems;
     // Show count summary per item type for selected owner
     if(displayItems.length>0){
       const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"];
@@ -934,17 +925,9 @@ function renderApp(){
       tCard.style.cssText="background:#431407;border:1px solid #78350f;border-radius:10px;padding:14px;margin-bottom:12px;";
       tCard.innerHTML="<p style='color:#fcd34d;font-weight:700;font-size:13px;margin:0 0 8px'>🚚 In Transit ("+transitItems.length+")</p>"
         +transitItems.map(i=>"<p style='color:#fbbf24;font-size:12px;margin:2px 0'>• "+i.name+" — "+i.barcode+"</p>").join("");
-      itemListDiv.appendChild(tCard);
+      content.appendChild(tCard);
     }
-      if(displayItems.length===0){
-        const empty=document.createElement("p");
-        empty.style.cssText="color:#334155;text-align:center;font-size:13px;margin-top:30px;";
-        empty.textContent="No active items";
-        itemListDiv.appendChild(empty);
-      }
-    } // end renderItemList
-
-    renderItemList(searchTerm.toLowerCase().trim());
+    if(displayItems.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No active items"));
     displayItems.forEach(item=>{
       const isExp=item.expDate&&new Date(item.expDate)<new Date();
       const days=item.expDate?Math.ceil((new Date(item.expDate)-Date.now())/86400000):null;
@@ -958,7 +941,7 @@ function renderApp(){
       histBtn.style.cssText="margin-top:8px;padding:5px 10px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;";
       histBtn.onclick=function(e){e.stopPropagation();setState({modal:{type:"item_history",item:item}});};
       card.appendChild(histBtn);
-      itemListDiv.appendChild(card);
+      content.appendChild(card);
     });
   }
 
