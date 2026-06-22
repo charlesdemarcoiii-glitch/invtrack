@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606221854-revert -->
+<!DOCTYPE html><!-- InvTrack v202606221858 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -880,7 +880,12 @@ function renderApp(){
     searchInput.placeholder="🔍  Search by name or barcode…";
     searchInput.style.cssText="width:100%;box-sizing:border-box;";
     searchInput.value=S.inventorySearch||"";
-    searchInput.oninput=function(){setState({inventorySearch:this.value});};
+    let searchDebounce=null;
+    searchInput.oninput=function(){
+      const val=this.value;
+      clearTimeout(searchDebounce);
+      searchDebounce=setTimeout(function(){setState({inventorySearch:val});},300);
+    };
     searchWrap.appendChild(searchInput);
     content.appendChild(searchWrap);
 
