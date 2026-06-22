@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606221920 -->
+<!DOCTYPE html><!-- InvTrack v202606221924 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -274,17 +274,23 @@ async function loadData(){
 async function submitUndoCheckout(item){
   const now=new Date().toISOString();
 
-  // Find the last log entry for this item BEFORE the checkout (the "from" field of the CHECK_OUT entry)
+  // Find the last CHECK_OUT log entry for this item to get previous location
   const itemLog=S.log.filter(l=>l.barcode===item.barcode).slice(); // already sorted newest first
   const checkoutEntry=itemLog.find(l=>l.action==="CHECK_OUT");
-  
-  // The "from" field of the CHECK_OUT log entry = where the item was before checkout
+
+  // Match owner by name (case-insensitive, trimmed) or by ID
   let returnOwner=null;
   if(checkoutEntry && checkoutEntry.from){
-    returnOwner=S.owners.find(o=>o.name===checkoutEntry.from||o.id===checkoutEntry.from);
+    const fromVal=checkoutEntry.from.trim().toLowerCase();
+    returnOwner=S.owners.find(o=>
+      o.name.trim().toLowerCase()===fromVal ||
+      o.id.trim().toLowerCase()===fromVal
+    );
   }
   // Fallback to Pool if we can't determine previous location
   if(!returnOwner) returnOwner=S.owners.find(o=>o.id.toUpperCase()==="POOL")||S.owners[0];
+  
+  console.log("Undo checkout - from log:", checkoutEntry?.from, "matched owner:", returnOwner?.name);
 
   // Optimistic UI
   const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,status:"active",ownerId:returnOwner.id,usedBy:""}:i);
@@ -1577,7 +1583,12 @@ function renderModal(){
     // Find previous location from log
     const itemLog2=S.log.filter(l=>l.barcode===item.barcode);
     const checkoutEntry2=itemLog2.find(l=>l.action==="CHECK_OUT");
-    const prevLocation=checkoutEntry2&&checkoutEntry2.from?checkoutEntry2.from:"Unclaimed Inventory";
+    let prevLocation="Unclaimed Inventory";
+    if(checkoutEntry2&&checkoutEntry2.from){
+      const fromVal2=checkoutEntry2.from.trim().toLowerCase();
+      const matchedOwner=S.owners.find(o=>o.name.trim().toLowerCase()===fromVal2||o.id.trim().toLowerCase()===fromVal2);
+      prevLocation=matchedOwner?matchedOwner.name:checkoutEntry2.from;
+    }
 
     // Question
     const question=document.createElement("p");
