@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606200130-loginfix -->
+<!DOCTYPE html><!-- InvTrack v202606221331 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -874,7 +874,7 @@ function renderApp(){
     const displayItems=isAdmin?(selectedOwner?activeItems.filter(i=>i.ownerId===selectedOwner.id):activeItems):visActiveItems;
     // Show count summary per item type for selected owner
     if(displayItems.length>0){
-      const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT"];
+      const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"];
       const counts={};
       displayItems.forEach(function(item){
         if(itemTypes.includes(item.name)){
@@ -1056,7 +1056,7 @@ function renderMultiDetails(){
   const ln1=el("label",{class:"label"},"Item Name");
   const sn1=el("select");
   sn1.appendChild(el("option",{value:""},"Select item…"));
-  ["DFX","DFXM","BTFT","DTF-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT"].forEach(function(item){sn1.appendChild(el("option",{value:item},item));});
+  ["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].forEach(function(item){sn1.appendChild(el("option",{value:item},item));});
   sn1.onchange=function(){name=this.value;};
   inner.appendChild(ln1);inner.appendChild(sn1);inner.appendChild(el("div",{style:{height:"14px"}}));
 
@@ -1318,7 +1318,7 @@ function renderModal(){
     const i1=document.createElement("select");
     i1.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";
     const defOpt1=document.createElement("option");defOpt1.value="";defOpt1.textContent="Select item…";i1.appendChild(defOpt1);
-    ["DFX","DFXM","BTFT","DTF-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT"].forEach(function(item){
+    ["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].forEach(function(item){
       const o=document.createElement("option");o.value=item;o.textContent=item;i1.appendChild(o);
     });
     i1.onchange=function(){name=this.value;};
