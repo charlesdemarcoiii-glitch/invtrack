@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606221858 -->
+<!DOCTYPE html><!-- InvTrack v202606221903 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -884,7 +884,7 @@ function renderApp(){
     searchInput.oninput=function(){
       const val=this.value;
       clearTimeout(searchDebounce);
-      searchDebounce=setTimeout(function(){setState({inventorySearch:val});},300);
+      searchDebounce=setTimeout(function(){setState({inventorySearch:val});},800);
     };
     searchWrap.appendChild(searchInput);
     content.appendChild(searchWrap);
