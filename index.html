@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606221331 -->
+<!DOCTYPE html><!-- InvTrack v202606221836 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -213,6 +213,7 @@ const S = {
   showAccountMenu:false, // account switcher dropdown
   tab:"dashboard",loading:false,toast:null,toastTimer:null,
   scanning:false,scanMode:null,scanHint:"",
+  inventorySearch:"",
   modal:null,selectedOwner:null,
   showScanPrompt:false,
   // Multi-scan
@@ -871,7 +872,21 @@ function renderApp(){
       });
       content.appendChild(filters);
     }
-    const displayItems=isAdmin?(selectedOwner?activeItems.filter(i=>i.ownerId===selectedOwner.id):activeItems):visActiveItems;
+    // Search bar
+    const searchWrap=document.createElement("div");
+    searchWrap.style.cssText="position:relative;margin-bottom:12px;";
+    const searchInput=document.createElement("input");
+    searchInput.type="text";
+    searchInput.placeholder="🔍  Search by name or barcode…";
+    searchInput.style.cssText="width:100%;box-sizing:border-box;";
+    searchInput.value=S.inventorySearch||"";
+    searchInput.oninput=function(){setState({inventorySearch:this.value});};
+    searchWrap.appendChild(searchInput);
+    content.appendChild(searchWrap);
+
+    const searchTerm=(S.inventorySearch||"").toLowerCase().trim();
+    const baseItems=isAdmin?(selectedOwner?activeItems.filter(i=>i.ownerId===selectedOwner.id):activeItems):visActiveItems;
+    const displayItems=searchTerm?baseItems.filter(i=>i.name.toLowerCase().includes(searchTerm)||i.barcode.toLowerCase().includes(searchTerm)):baseItems;
     // Show count summary per item type for selected owner
     if(displayItems.length>0){
       const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"];
@@ -920,6 +935,12 @@ function renderApp(){
       const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",border:`1px solid ${isExp?"#7f1d1d":soon?"#78350f":"#1e293b"}`}});
       const badge=isExp?`<span class="badge" style="background:#7f1d1d;color:#fca5a5">EXPIRED</span>`:soon?`<span class="badge" style="background:#78350f;color:#fcd34d">${days}d LEFT</span>`:`<span class="badge" style="background:#14532d;color:#86efac">OK</span>`;
       card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">${item.name}</div><div style="color:#64748b;font-size:11px;margin-top:2px;font-family:monospace">${item.barcode} · ${item.type}</div></div>${badge}</div><div style="display:flex;gap:12px;margin-top:6px"><span style="color:#64748b;font-size:11px">Exp: ${item.expDate||"—"}</span>${isAdmin?`<span style="color:#64748b;font-size:11px">Owner: ${owners.find(o=>o.id===item.ownerId)?.name||item.ownerId}</span>`:""}</div>`;
+      // History button
+      const histBtn=document.createElement("button");
+      histBtn.textContent="📋 History";
+      histBtn.style.cssText="margin-top:8px;padding:5px 10px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;";
+      histBtn.onclick=function(e){e.stopPropagation();setState({modal:{type:"item_history",item:item}});};
+      card.appendChild(histBtn);
       content.appendChild(card);
     });
   }
@@ -1488,6 +1509,82 @@ function renderModal(){
     cancelBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";
     cancelBtn.onclick=function(){setState({modal:null});};
     inner2.appendChild(cancelBtn);
+
+    page.appendChild(inner2);
+    return page;
+  }
+
+  if(modal.type==="item_history"){
+    const item=modal.item;
+    const itemLog=S.log.filter(l=>l.barcode===item.barcode);
+
+    const page=document.createElement("div");
+    page.style.cssText="position:fixed;inset:0;background:#0a0f1c;z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+    const inner2=document.createElement("div");
+    inner2.style.cssText="max-width:480px;margin:0 auto;padding:24px 20px;";
+
+    // Header
+    const hdr=document.createElement("div");
+    hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-top:8px;";
+    const title=document.createElement("div");
+    title.innerHTML="<div style='color:#f1f5f9;font-size:18px;font-weight:700'>"+item.name+"</div><div style='color:#64748b;font-size:12px;font-family:monospace'>"+item.barcode+"</div>";
+    const xBtn=document.createElement("button");
+    xBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:18px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit;";
+    xBtn.textContent="✕";
+    xBtn.onclick=function(){setState({modal:null});};
+    hdr.appendChild(title);hdr.appendChild(xBtn);
+    inner2.appendChild(hdr);
+
+    // Current status card
+    const statusCard=document.createElement("div");
+    statusCard.style.cssText="background:#111827;border:1px solid #1e293b;border-radius:12px;padding:14px 16px;margin-bottom:16px;";
+    const ownerName=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+    statusCard.innerHTML="<div style='color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px'>Current Status</div>"
+      +"<div style='display:flex;gap:16px;flex-wrap:wrap'>"
+      +"<div><div style='color:#64748b;font-size:11px'>Location</div><div style='color:#f1f5f9;font-weight:600;font-size:13px'>"+ownerName+"</div></div>"
+      +"<div><div style='color:#64748b;font-size:11px'>Status</div><div style='color:#f1f5f9;font-weight:600;font-size:13px'>"+item.status+"</div></div>"
+      +"<div><div style='color:#64748b;font-size:11px'>Expires</div><div style='color:#f1f5f9;font-weight:600;font-size:13px'>"+(item.expDate?item.expDate.substring(0,10):"—")+"</div></div>"
+      +"</div>";
+    inner2.appendChild(statusCard);
+
+    // History log
+    const histTitle=document.createElement("div");
+    histTitle.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;";
+    histTitle.textContent="Activity History ("+itemLog.length+" events)";
+    inner2.appendChild(histTitle);
+
+    if(itemLog.length===0){
+      const empty=document.createElement("div");
+      empty.style.cssText="color:#334155;font-size:13px;text-align:center;padding:24px 0;";
+      empty.textContent="No activity recorded yet";
+      inner2.appendChild(empty);
+    } else {
+      const actionColors={CHECK_IN:"#22c55e",CHECK_OUT:"#f59e0b",TRANSFER:"#6366f1",ORDER_IN:"#0ea5e9",ORDER_OUT:"#a855f7"};
+      const actionIcons={CHECK_IN:"📥",CHECK_OUT:"📤",TRANSFER:"🔄",ORDER_IN:"📦",ORDER_OUT:"🚚"};
+      itemLog.forEach(function(entry){
+        const row=document.createElement("div");
+        row.style.cssText="background:#111827;border:1px solid #1e293b;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start;";
+        const icon=document.createElement("span");
+        icon.style.cssText="font-size:18px;margin-top:2px;";
+        icon.textContent=actionIcons[entry.action]||"📋";
+        const info=document.createElement("div");
+        info.style.cssText="flex:1;";
+        const actionColor=actionColors[entry.action]||"#94a3b8";
+        const actionLabel=(entry.action||"").replace(/_/g," ");
+        let detail="";
+        if(entry.from&&entry.to)detail=entry.from+" → "+entry.to;
+        else if(entry.to)detail="→ "+entry.to;
+        else if(entry.from)detail="from "+entry.from;
+        info.innerHTML="<div style='display:flex;justify-content:space-between;align-items:center'>"
+          +"<span style='color:"+actionColor+";font-weight:700;font-size:12px'>"+actionLabel+"</span>"
+          +"<span style='color:#475569;font-size:10px'>"+formatDate(entry.ts)+"</span>"
+          +"</div>"
+          +(detail?"<div style='color:#94a3b8;font-size:12px;margin-top:3px'>"+detail+"</div>":"")
+          +"<div style='color:#475569;font-size:11px;margin-top:2px'>by "+entry.user+"</div>";
+        row.appendChild(icon);row.appendChild(info);
+        inner2.appendChild(row);
+      });
+    }
 
     page.appendChild(inner2);
     return page;
