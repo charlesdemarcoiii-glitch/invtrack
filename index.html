@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606221914 -->
+<!DOCTYPE html><!-- InvTrack v202606221920 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -714,6 +714,7 @@ function renderLogin(){
         const existing=S.accounts.find(a=>a.username.toLowerCase()===u.username.toLowerCase());
         const accounts=existing?S.accounts:[...S.accounts,u];
         setState({user:u,accounts,showAccountMenu:false});
+        loadData(); // load data immediately after login
       })
       .catch(err=>{
         let msg="Incorrect email or password";
