@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606221903 -->
+<!DOCTYPE html><!-- InvTrack v202606221914 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -271,6 +271,31 @@ async function loadData(){
 }
 
 // ── ACTIONS ───────────────────────────────────────────────────────────────────
+async function submitUndoCheckout(item){
+  const now=new Date().toISOString();
+
+  // Find the last log entry for this item BEFORE the checkout (the "from" field of the CHECK_OUT entry)
+  const itemLog=S.log.filter(l=>l.barcode===item.barcode).slice(); // already sorted newest first
+  const checkoutEntry=itemLog.find(l=>l.action==="CHECK_OUT");
+  
+  // The "from" field of the CHECK_OUT log entry = where the item was before checkout
+  let returnOwner=null;
+  if(checkoutEntry && checkoutEntry.from){
+    returnOwner=S.owners.find(o=>o.name===checkoutEntry.from||o.id===checkoutEntry.from);
+  }
+  // Fallback to Pool if we can't determine previous location
+  if(!returnOwner) returnOwner=S.owners.find(o=>o.id.toUpperCase()==="POOL")||S.owners[0];
+
+  // Optimistic UI
+  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,status:"active",ownerId:returnOwner.id,usedBy:""}:i);
+  setState({items:updatedItems});
+  showToast("↩️ "+item.name+" returned to "+returnOwner.name);
+  // Write to Firestore in background
+  updateItem(item.barcode,{status:"active",ownerId:returnOwner.id,usedBy:""})
+    .then(()=>addLog({ts:now,action:"UNDO_CHECKOUT",barcode:item.barcode,itemName:item.name,from:"USED",to:returnOwner.name,user:S.user.username}))
+    .catch(e=>{console.error("Undo checkout failed:",e);showToast("Failed: "+e.message,"err");});
+}
+
 async function submitCheckin(barcode,name,type,expDate,ownerId){
   const now=new Date().toISOString();
   const ownerName=S.owners.find(o=>o.id===ownerId)?.name||ownerId;
@@ -957,6 +982,10 @@ function renderApp(){
     visUsedItems.forEach(item=>{
       const card=el("div",{style:{background:"#111827",borderRadius:"10px",padding:"12px 14px",marginBottom:"8px",border:"1px solid #374151"}});
       card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#9ca3af;font-size:14px">${item.name}</div><div style="color:#64748b;font-size:11px;margin-top:2px;font-family:monospace">${item.barcode} · ${item.type}</div></div><span class="badge" style="background:#374151;color:#9ca3af">USED</span></div><div style="display:flex;gap:12px;margin-top:6px">${item.expDate?`<span style="color:#64748b;font-size:11px">Exp: ${item.expDate}</span>`:""}${isAdmin?`<span style="color:#64748b;font-size:11px">Used by: ${item.usedBy||"—"}</span>`:""}</div>`;
+      if(isAdmin){
+        card.style.cursor="pointer";
+        card.onclick=function(){setState({modal:{type:"undo_checkout",item:item}});};
+      }
       content.appendChild(card);
     });
   }
@@ -1517,6 +1546,58 @@ function renderModal(){
 
     page.appendChild(inner2);
     return page;
+  }
+
+  if(modal.type==="undo_checkout"){
+    const item=modal.item;
+    const div2=el("div",{class:"overlay"});
+    const inner2=el("div",{class:"overlay-inner"});
+
+    const titleRow=document.createElement("div");
+    titleRow.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";
+    const title=document.createElement("h2");
+    title.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";
+    title.textContent="Un-Check Out Item?";
+    const xBtn=document.createElement("button");
+    xBtn.style.cssText="background:none;border:none;color:#475569;font-size:24px;cursor:pointer;";
+    xBtn.textContent="✕";
+    xBtn.onclick=function(){setState({modal:null});};
+    titleRow.appendChild(title);titleRow.appendChild(xBtn);
+    inner2.appendChild(titleRow);
+
+    // Item info card
+    const infoCard=document.createElement("div");
+    infoCard.style.cssText="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;margin-bottom:20px;";
+    infoCard.innerHTML="<div style='color:#f1f5f9;font-weight:700;font-size:15px;margin-bottom:4px'>"+item.name+"</div>"
+      +"<div style='color:#64748b;font-size:12px;font-family:monospace;margin-bottom:4px'>"+item.barcode+"</div>"
+      +"<div style='color:#64748b;font-size:12px'>Used by: "+(item.usedBy||"—")+"</div>";
+    inner2.appendChild(infoCard);
+
+    // Find previous location from log
+    const itemLog2=S.log.filter(l=>l.barcode===item.barcode);
+    const checkoutEntry2=itemLog2.find(l=>l.action==="CHECK_OUT");
+    const prevLocation=checkoutEntry2&&checkoutEntry2.from?checkoutEntry2.from:"Unclaimed Inventory";
+
+    // Question
+    const question=document.createElement("p");
+    question.style.cssText="color:#94a3b8;font-size:14px;text-align:center;margin-bottom:20px;";
+    question.textContent="This will move the item back to: "+prevLocation;
+    inner2.appendChild(question);
+
+    const confirmBtn=document.createElement("button");
+    confirmBtn.textContent="✓ Yes, Un-Check Out";
+    confirmBtn.style.cssText="width:100%;padding:16px;border-radius:12px;border:none;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;";
+    confirmBtn.onclick=function(){setState({modal:null});submitUndoCheckout(item);};
+    inner2.appendChild(confirmBtn);
+
+    const cancelBtn=document.createElement("button");
+    cancelBtn.textContent="Cancel";
+    cancelBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";
+    cancelBtn.onclick=function(){setState({modal:null});};
+    inner2.appendChild(cancelBtn);
+
+    div2.appendChild(inner2);
+    return div2;
   }
 
   if(modal.type==="item_history"){
