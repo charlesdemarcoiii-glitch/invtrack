@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606221924 -->
+<!DOCTYPE html><!-- InvTrack v202606251713 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -939,7 +939,13 @@ function renderApp(){
         summaryCard.style.cssText="background:#111827;border-radius:12px;border:1px solid #1e293b;padding:14px 16px;margin-bottom:16px;";
         const summaryTitle=document.createElement("p");
         summaryTitle.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px;";
-        summaryTitle.textContent=selectedOwner?"Count — "+selectedOwner.name:"Count — All Inventories";
+        if(!isAdmin){
+          // Regular users always see their own inventory count label
+          const userOwner=owners.find(o=>o.id===user.ownerId);
+          summaryTitle.textContent="Count — "+(userOwner?userOwner.name:user.username);
+        } else {
+          summaryTitle.textContent=selectedOwner?"Count — "+selectedOwner.name:"Count — All Inventories";
+        }
         summaryCard.appendChild(summaryTitle);
         const grid=document.createElement("div");
         grid.style.cssText="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;";
