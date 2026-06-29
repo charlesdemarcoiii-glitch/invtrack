@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606251713 -->
+<!DOCTYPE html><!-- InvTrack v202606291658 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -263,7 +263,7 @@ async function loadData(){
       owners:owners.map(o=>({id:o._id||o.id,name:o.name,type:o.type})),
       items:items.map(i=>({barcode:i._id||i.barcode,name:i.name,type:i.type,expDate:i.expDate,ownerId:i.ownerId,status:i.status||"active",addedAt:i.addedAt,usedBy:i.usedBy||""})),
       log:log.map(l=>({ts:l.ts,action:l.action,barcode:l.barcode,itemName:l.itemName,from:l.from,to:l.to,user:l.user})).sort((a,b)=>new Date(b.ts)-new Date(a.ts)),
-      users:users.map(u=>({username:u._id||u.username,role:u.role,ownerId:u.ownerId||""})),
+      users:users.map(u=>({username:u._id||u.username,role:u.role,ownerId:u.ownerId||"",viewableOwners:u.viewableOwners||[]})),
       orders:orders.map(o=>({id:o._id||o.id,name:o.name,count:o.count,createdBy:o.createdBy,createdAt:o.createdAt,status:o.status,items:o.items||""})),
       loading:false
     });
@@ -271,6 +271,15 @@ async function loadData(){
 }
 
 // ── ACTIONS ───────────────────────────────────────────────────────────────────
+async function saveUserAccess(username, viewableOwners){
+  // Update Firestore
+  await window.fsUpdate("users", username, {viewableOwners: viewableOwners});
+  // Update local state
+  const updatedUsers=S.users.map(u=>u.username===username?{...u,viewableOwners:viewableOwners}:u);
+  setState({users:updatedUsers});
+  showToast("✅ Access updated for "+username);
+}
+
 async function submitUndoCheckout(item){
   const now=new Date().toISOString();
 
@@ -844,7 +853,7 @@ function renderApp(){
 
   // TABS
   const tabs=el("div",{style:{display:"flex",borderBottom:"1px solid #1e293b",background:"#111827"}});
-  [["dashboard","Dashboard"],["inventory","Inventory"],["used","Used"],["orders","Orders"],["log","Log"]].forEach(([id,label])=>{
+  [["dashboard","Dashboard"],["inventory","Inventory"],["used","Used"],["orders","Orders"],["log","Log"],...(isAdmin?[["users","👥 Users"]]:[])].forEach(([id,label])=>{
     const btn=el("button",{class:"tab-btn",style:{color:tab===id?"#38bdf8":"#475569",fontWeight:tab===id?"700":"500",borderBottom:tab===id?"2px solid #38bdf8":"2px solid transparent",fontSize:"12px"}},label);
     btn.onclick=()=>setState({tab:id});
     tabs.appendChild(btn);
@@ -971,6 +980,52 @@ function renderApp(){
       content.appendChild(tCard);
     }
     if(displayItems.length===0)content.appendChild(el("p",{style:{color:"#334155",textAlign:"center",fontSize:"13px",marginTop:"30px"}},"No active items"));
+
+    // Show viewable inventories for non-admin users (read-only)
+    if(!isAdmin){
+      const viewableOwners=S.users.find(u=>u.username===user.username)?.viewableOwners||[];
+      if(viewableOwners.length>0){
+        const divider=document.createElement("div");
+        divider.style.cssText="margin:20px 0 12px;border-top:1px solid #1e293b;padding-top:16px;";
+        divider.innerHTML="<p style='color:#475569;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin:0 0 12px'>Viewable Inventories</p>";
+        content.appendChild(divider);
+
+        viewableOwners.forEach(function(ownerId){
+          const viewOwner=owners.find(o=>o.id===ownerId);
+          if(!viewOwner) return;
+
+          const ownerItems=items.filter(i=>i.ownerId===ownerId&&i.status==="active");
+          const ownerSection=document.createElement("div");
+          ownerSection.style.cssText="margin-bottom:16px;";
+
+          const ownerTitle=document.createElement("p");
+          ownerTitle.style.cssText="color:#64748b;font-size:12px;font-weight:600;margin:0 0 8px;";
+          const icon=viewOwner.type==="person"?"👤":"🗄";
+          ownerTitle.textContent=icon+" "+viewOwner.name+" ("+ownerItems.length+" items)";
+          ownerSection.appendChild(ownerTitle);
+
+          if(ownerItems.length===0){
+            const empty=document.createElement("p");
+            empty.style.cssText="color:#334155;font-size:12px;margin:0;";
+            empty.textContent="No active items";
+            ownerSection.appendChild(empty);
+          } else {
+            ownerItems.forEach(function(item){
+              const card=document.createElement("div");
+              card.style.cssText="background:#0f172a;border-radius:10px;border:1px solid #1e293b;padding:12px 14px;margin-bottom:6px;opacity:0.85;";
+              const expDate=item.expDate?item.expDate.substring(0,10):"—";
+              card.innerHTML="<div style='display:flex;justify-content:space-between;align-items:center'>"
+                +"<div><div style='color:#f1f5f9;font-weight:700;font-size:13px'>"+item.name+"</div>"
+                +"<div style='color:#64748b;font-size:11px;font-family:monospace'>"+item.barcode+" · "+item.type+"</div></div>"
+                +"<span style='color:#475569;font-size:10px;font-weight:600'>VIEW ONLY</span></div>"
+                +"<div style='color:#64748b;font-size:11px;margin-top:4px'>Exp: "+expDate+"</div>";
+              ownerSection.appendChild(card);
+            });
+          }
+          content.appendChild(ownerSection);
+        });
+      }
+    }
     displayItems.forEach(item=>{
       const isExp=item.expDate&&new Date(item.expDate)<new Date();
       const days=item.expDate?Math.ceil((new Date(item.expDate)-Date.now())/86400000):null;
@@ -1014,6 +1069,60 @@ function renderApp(){
       const st=order.status||"open";
       const barcodes=(order.items||"").split(",").filter(b=>b.trim());
       card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">${order.name||order.id}</div><div style="color:#64748b;font-size:11px;font-family:monospace;margin-top:2px">${order.id}</div><div style="color:#64748b;font-size:11px;margin-top:2px">Items: ${barcodes.length} · By: ${order.createdBy}</div></div><span class="badge" style="background:${statusBgs[st]||"#1e293b"};color:${statusColors[st]||"#64748b"}">${st.toUpperCase()}</span></div><div style="color:#64748b;font-size:11px;margin-top:6px">${order.createdAt?formatDate(order.createdAt):""}</div>`;
+      content.appendChild(card);
+    });
+  }
+
+  // USERS (admin only)
+  if(tab==="users"&&isAdmin){
+    content.appendChild(el("p",{style:{color:"#475569",fontSize:"12px",fontWeight:"600",margin:"0 0 12px",textTransform:"uppercase",letterSpacing:".07em"}},"User Inventory Access"));
+
+    S.users.forEach(function(u){
+      if(!u.username) return;
+      const isCurrentUser = u.username===user.username;
+      const card=document.createElement("div");
+      card.style.cssText="background:#111827;border-radius:12px;border:1px solid #1e293b;padding:14px 16px;margin-bottom:10px;";
+
+      const hdr=document.createElement("div");
+      hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;";
+      const userInfo=document.createElement("div");
+      const userOwner=owners.find(o=>o.id===u.ownerId);
+      userInfo.innerHTML="<div style='color:#f1f5f9;font-weight:700;font-size:14px'>"+(userOwner?userOwner.name:u.username)+"</div>"
+        +"<div style='color:#64748b;font-size:11px'>"+u.username+"</div>"
+        +"<div style='color:#64748b;font-size:11px;text-transform:uppercase;margin-top:2px'>"+u.role+"</div>";
+      hdr.appendChild(userInfo);
+
+      if(u.role!=="admin"){
+        const editBtn=document.createElement("button");
+        editBtn.textContent="Edit Access";
+        editBtn.style.cssText="padding:6px 12px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;";
+        editBtn.onclick=function(){setState({modal:{type:"edit_user_access",targetUser:u}});};
+        hdr.appendChild(editBtn);
+      }
+      card.appendChild(hdr);
+
+      // Show current viewable owners
+      const viewable=(u.viewableOwners||[]);
+      if(viewable.length>0){
+        const accessDiv=document.createElement("div");
+        accessDiv.style.cssText="display:flex;flex-wrap:wrap;gap:6px;";
+        viewable.forEach(function(oid){
+          const o=owners.find(x=>x.id===oid);
+          if(o){
+            const badge=document.createElement("span");
+            badge.style.cssText="background:#0ea5e918;border:1px solid #0ea5e933;color:#38bdf8;font-size:11px;padding:3px 8px;border-radius:5px;";
+            badge.textContent=(o.type==="person"?"👤":"🗄")+" "+o.name;
+            accessDiv.appendChild(badge);
+          }
+        });
+        card.appendChild(accessDiv);
+      } else if(u.role!=="admin"){
+        const none=document.createElement("div");
+        none.style.cssText="color:#334155;font-size:12px;";
+        none.textContent="No additional inventory access";
+        card.appendChild(none);
+      }
+
       content.appendChild(card);
     });
   }
@@ -1550,6 +1659,90 @@ function renderModal(){
       submitOrderReceive(order.id,destOwnerId);
     };
     inner2.appendChild(confirmBtn);
+
+    const cancelBtn=document.createElement("button");
+    cancelBtn.textContent="Cancel";
+    cancelBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";
+    cancelBtn.onclick=function(){setState({modal:null});};
+    inner2.appendChild(cancelBtn);
+
+    page.appendChild(inner2);
+    return page;
+  }
+
+  if(modal.type==="edit_user_access"){
+    const targetUser=modal.targetUser;
+    const currentViewable=targetUser.viewableOwners||[];
+    let selected=currentViewable.slice();
+
+    const page=document.createElement("div");
+    page.style.cssText="position:fixed;inset:0;background:#0a0f1c;z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+    const inner2=document.createElement("div");
+    inner2.style.cssText="max-width:480px;margin:0 auto;padding:24px 20px;";
+
+    // Header
+    const hdr=document.createElement("div");
+    hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-top:8px;";
+    const title=document.createElement("div");
+    const targetOwner=owners.find(o=>o.id===targetUser.ownerId);
+    title.innerHTML="<div style='color:#f1f5f9;font-size:18px;font-weight:700'>Edit Inventory Access</div>"
+      +"<div style='color:#64748b;font-size:12px'>"+(targetOwner?targetOwner.name:targetUser.username)+"</div>";
+    const xBtn=document.createElement("button");
+    xBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:18px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit;";
+    xBtn.textContent="✕";
+    xBtn.onclick=function(){setState({modal:null});};
+    hdr.appendChild(title);hdr.appendChild(xBtn);
+    inner2.appendChild(hdr);
+
+    const subtitle=document.createElement("p");
+    subtitle.style.cssText="color:#94a3b8;font-size:13px;margin-bottom:16px;";
+    subtitle.textContent="Select which inventories this user can view (read-only):";
+    inner2.appendChild(subtitle);
+
+    // Owner checkboxes — exclude their own inventory, USED, TRANSIT
+    const viewableOwners=owners.filter(function(o){
+      return o.id!==targetUser.ownerId && o.id!=="USED" && o.id.toUpperCase()!=="TRANSIT";
+    });
+
+    viewableOwners.forEach(function(o){
+      const isChecked=selected.includes(o.id);
+      const row=document.createElement("div");
+      row.style.cssText="display:flex;align-items:center;gap:12px;padding:12px 14px;background:#0f172a;border-radius:10px;border:1px solid "+(isChecked?"#0ea5e9":"#1e293b")+";margin-bottom:8px;cursor:pointer;";
+
+      const checkbox=document.createElement("input");
+      checkbox.type="checkbox";
+      checkbox.checked=isChecked;
+      checkbox.style.cssText="width:18px;height:18px;cursor:pointer;accent-color:#0ea5e9;flex-shrink:0;";
+
+      const label=document.createElement("div");
+      const icon=o.type==="person"?"👤":"🗄";
+      label.innerHTML="<div style='color:#f1f5f9;font-weight:600;font-size:14px'>"+icon+" "+o.name+"</div>"
+        +"<div style='color:#64748b;font-size:11px'>"+o.id+"</div>";
+
+      row.onclick=function(){
+        checkbox.checked=!checkbox.checked;
+        if(checkbox.checked){
+          if(!selected.includes(o.id)) selected.push(o.id);
+          row.style.borderColor="#0ea5e9";
+        } else {
+          selected=selected.filter(function(x){return x!==o.id;});
+          row.style.borderColor="#1e293b";
+        }
+      };
+
+      row.appendChild(checkbox);row.appendChild(label);
+      inner2.appendChild(row);
+    });
+
+    // Save button
+    const saveBtn=document.createElement("button");
+    saveBtn.textContent="✓ Save Access";
+    saveBtn.style.cssText="width:100%;padding:16px;border-radius:12px;border:none;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;margin-top:16px;margin-bottom:10px;";
+    saveBtn.onclick=function(){
+      saveUserAccess(targetUser.username, selected);
+      setState({modal:null});
+    };
+    inner2.appendChild(saveBtn);
 
     const cancelBtn=document.createElement("button");
     cancelBtn.textContent="Cancel";
