@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202606291658 -->
+<!DOCTYPE html><!-- InvTrack v202606291711 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1010,17 +1010,26 @@ function renderApp(){
             empty.textContent="No active items";
             ownerSection.appendChild(empty);
           } else {
+            // Show count per item type like the main inventory summary
+            const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"];
+            const counts={};
             ownerItems.forEach(function(item){
-              const card=document.createElement("div");
-              card.style.cssText="background:#0f172a;border-radius:10px;border:1px solid #1e293b;padding:12px 14px;margin-bottom:6px;opacity:0.85;";
-              const expDate=item.expDate?item.expDate.substring(0,10):"—";
-              card.innerHTML="<div style='display:flex;justify-content:space-between;align-items:center'>"
-                +"<div><div style='color:#f1f5f9;font-weight:700;font-size:13px'>"+item.name+"</div>"
-                +"<div style='color:#64748b;font-size:11px;font-family:monospace'>"+item.barcode+" · "+item.type+"</div></div>"
-                +"<span style='color:#475569;font-size:10px;font-weight:600'>VIEW ONLY</span></div>"
-                +"<div style='color:#64748b;font-size:11px;margin-top:4px'>Exp: "+expDate+"</div>";
-              ownerSection.appendChild(card);
+              const key=itemTypes.includes(item.name)?item.name:item.type||"Other";
+              counts[key]=(counts[key]||0)+1;
             });
+            const countCard=document.createElement("div");
+            countCard.style.cssText="background:#0f172a;border-radius:10px;border:1px solid #1e293b;padding:12px 14px;";
+            const countGrid=document.createElement("div");
+            countGrid.style.cssText="display:flex;flex-wrap:wrap;gap:8px;";
+            Object.entries(counts).forEach(function([name,count]){
+              const pill=document.createElement("div");
+              pill.style.cssText="background:#111827;border:1px solid #1e293b;border-radius:8px;padding:6px 12px;";
+              pill.innerHTML="<span style='color:#94a3b8;font-size:11px;font-weight:600'>"+name+"</span>"
+                +"<span style='color:#f1f5f9;font-weight:700;font-size:15px;display:block;text-align:center'>"+count+"</span>";
+              countGrid.appendChild(pill);
+            });
+            countCard.appendChild(countGrid);
+            ownerSection.appendChild(countCard);
           }
           content.appendChild(ownerSection);
         });
