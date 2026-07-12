@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202607121904 -->
+<!DOCTYPE html><!-- InvTrack v202607121936 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1492,7 +1492,8 @@ function renderOrderGen(){
 function renderTransferPage(modal,owners,user){
   const item=modal.item;
   const isAdmin=user.role==="admin";
-  const fromName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+  const facilityMatch=S.facilities&&S.facilities.find(f=>f.id===item.ownerId);
+  const fromName=facilityMatch?facilityMatch.name:(owners.find(o=>o.id===item.ownerId)?.name||item.ownerId);
   const userOwner=owners.find(o=>o.id===user.ownerId);
   const isFacilityTransfer=modal.facilityTransfer||false;
   const facilityName=modal.facilityName||"";
@@ -1709,11 +1710,11 @@ function renderModal(){
     inner.appendChild(bodyP);inner.appendChild(nameP);inner.appendChild(bcP);
 
     const confirmBtn=document.createElement("button");
-    confirmBtn.textContent="✅ Confirm — Move to Used";
+    const isCapital=modal.item.type==="Capital Equipment";
+    confirmBtn.textContent=isCapital?"✅ Confirm":"✅ Confirm — Move to Used";
     confirmBtn.style.cssText="width:100%;padding:16px;border-radius:10px;border:none;background:#f59e0b;color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;-webkit-appearance:none;";
     confirmBtn.onclick=function(){
-      // Capital Equipment goes to a facility instead of Used
-      if(modal.item.type==="Capital Equipment"){
+      if(isCapital){
         setState({modal:{type:"facility_checkout",item:modal.item}});
       } else {
         setState({modal:null});submitCheckout(modal.item);
