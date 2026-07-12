@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202607080001 -->
+<!DOCTYPE html><!-- InvTrack v202607121904 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -130,6 +130,16 @@ async function fsWaitForReady(){
   }
 }
 
+async function getFacilities(){
+  await fsWaitForReady();
+  try{ return await window.fsGetAll("facilities"); }
+  catch(e){ return []; }
+}
+
+async function addFacility(facility){
+  await window.fsSet("facilities", facility.id, facility);
+}
+
 async function getItems(){
   await fsWaitForReady();
   return await window.fsGetAll("items");
@@ -214,6 +224,7 @@ const S = {
   tab:"dashboard",loading:false,toast:null,toastTimer:null,
   scanning:false,scanMode:null,scanHint:"",
   inventorySearch:"",
+  facilities:[],
   modal:null,selectedOwner:null,
   showScanPrompt:false,
   // Multi-scan
@@ -244,14 +255,15 @@ function showToast(msg,type="ok"){
 async function loadData(){
   setState({loading:true});
   try{
-    const [ownersR,itemsR,logR,usersR,ordersR]=await Promise.allSettled([
-      getOwners(),getItems(),getLog(),getUsers(),getOrders()
+    const [ownersR,itemsR,logR,usersR,ordersR,facilitiesR]=await Promise.allSettled([
+      getOwners(),getItems(),getLog(),getUsers(),getOrders(),getFacilities()
     ]);
     const owners = ownersR.status==="fulfilled" ? ownersR.value : S.owners;
     const items = itemsR.status==="fulfilled" ? itemsR.value : S.items.map(i=>({_id:i.barcode,...i}));
     const log = logR.status==="fulfilled" ? logR.value : [];
     const users = usersR.status==="fulfilled" ? usersR.value : S.users.map(u=>({_id:u.username,...u}));
     const orders = ordersR.status==="fulfilled" ? ordersR.value : S.orders.map(o=>({_id:o.id,...o}));
+    const facilities = facilitiesR&&facilitiesR.status==="fulfilled" ? facilitiesR.value : S.facilities;
 
     if(ownersR.status==="rejected")console.error("Owners load failed:",ownersR.reason);
     if(itemsR.status==="rejected")console.error("Items load failed:",itemsR.reason);
@@ -265,6 +277,7 @@ async function loadData(){
       log:log.map(l=>({ts:l.ts,action:l.action,barcode:l.barcode,itemName:l.itemName,from:l.from,to:l.to,user:l.user})).sort((a,b)=>new Date(b.ts)-new Date(a.ts)),
       users:users.map(u=>({username:u._id||u.username,role:u.role,ownerId:u.ownerId||"",viewableOwners:u.viewableOwners||[]})),
       orders:orders.map(o=>({id:o._id||o.id,name:o.name,count:o.count,createdBy:o.createdBy,createdAt:o.createdAt,status:o.status,items:o.items||""})),
+      facilities:(facilities||[]).map(f=>({id:f._id||f.id,name:f.name})),
       loading:false
     });
   }catch(e){console.error("Load failed:",e);showToast("Could not load data","err");setState({loading:false});}
@@ -278,6 +291,19 @@ async function saveUserAccess(username, viewableOwners){
   const updatedUsers=S.users.map(u=>u.username===username?{...u,viewableOwners:viewableOwners}:u);
   setState({users:updatedUsers});
   showToast("✅ Access updated for "+username);
+}
+
+async function submitFacilityCheckout(item, facility){
+  const now=new Date().toISOString();
+  const fromName=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+  // Optimistic UI — move item to facility
+  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,ownerId:facility.id,status:"active"}:i);
+  setState({items:updatedItems});
+  showToast("🏥 "+item.name+" → "+facility.name);
+  // Write to Firestore in background
+  updateItem(item.barcode,{ownerId:facility.id,status:"active"})
+    .then(()=>addLog({ts:now,action:"FACILITY_OUT",barcode:item.barcode,itemName:item.name,from:fromName,to:facility.name,user:S.user.username}))
+    .catch(e=>{console.error("Facility checkout failed:",e);showToast("Failed: "+e.message,"err");});
 }
 
 async function submitUndoCheckout(item){
@@ -516,7 +542,13 @@ function handleScan(barcode){
     if(S.user.role!=="admin"&&item.ownerId===S.user.ownerId){
       showToast("Item is already in your inventory","warn");return;
     }
-    setState({modal:{type:"transfer",item}});
+    // Check if item is at a facility — show friendly transfer back message
+    const isFacilityItem=S.facilities&&S.facilities.find(f=>f.id===item.ownerId);
+    if(isFacilityItem){
+      setState({modal:{type:"transfer",item,facilityTransfer:true,facilityName:isFacilityItem.name}});
+    } else {
+      setState({modal:{type:"transfer",item}});
+    }
   }
 }
 
@@ -853,7 +885,7 @@ function renderApp(){
 
   // TABS
   const tabs=el("div",{style:{display:"flex",borderBottom:"1px solid #1e293b",background:"#111827"}});
-  [["dashboard","Dashboard"],["inventory","Inventory"],["used","Used"],["orders","Orders"],["log","Log"],...(isAdmin?[["users","👥 Users"]]:[])].forEach(([id,label])=>{
+  [["dashboard","Dashboard"],["inventory","Inventory"],["capital","Trays & Capital"],["used","Used"],["orders","Orders"],["log","Log"],...(isAdmin?[["users","👥 Users"]]:[])].forEach(([id,label])=>{
     const btn=el("button",{class:"tab-btn",style:{color:tab===id?"#38bdf8":"#475569",fontWeight:tab===id?"700":"500",borderBottom:tab===id?"2px solid #38bdf8":"2px solid transparent",fontSize:"12px"}},label);
     btn.onclick=()=>setState({tab:id});
     tabs.appendChild(btn);
@@ -1080,6 +1112,99 @@ function renderApp(){
       card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-weight:700;color:#f1f5f9;font-size:14px">${order.name||order.id}</div><div style="color:#64748b;font-size:11px;font-family:monospace;margin-top:2px">${order.id}</div><div style="color:#64748b;font-size:11px;margin-top:2px">Items: ${barcodes.length} · By: ${order.createdBy}</div></div><span class="badge" style="background:${statusBgs[st]||"#1e293b"};color:${statusColors[st]||"#64748b"}">${st.toUpperCase()}</span></div><div style="color:#64748b;font-size:11px;margin-top:6px">${order.createdAt?formatDate(order.createdAt):""}</div>`;
       content.appendChild(card);
     });
+  }
+
+  // TRAYS & CAPITAL TAB
+  if(tab==="capital"){
+    const capitalItems=items.filter(i=>i.type==="Capital Equipment");
+    const facilities=S.facilities||[];
+
+    // Admin: Add Facility button
+    if(isAdmin){
+      const addFacBtn=document.createElement("button");
+      addFacBtn.textContent="+ Add Facility";
+      addFacBtn.style.cssText="padding:8px 16px;border-radius:8px;border:1px solid #6366f133;background:#6366f118;color:#818cf8;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;margin-bottom:16px;";
+      addFacBtn.onclick=function(){setState({modal:{type:"add_facility"}});};
+      content.appendChild(addFacBtn);
+    }
+
+    // Personal Capital section
+    const myCapital=isAdmin?capitalItems.filter(i=>i.status==="active"&&!facilities.find(f=>f.id===i.ownerId)):capitalItems.filter(i=>i.ownerId===user.ownerId&&i.status==="active");
+    const personalTitle=document.createElement("p");
+    personalTitle.style.cssText="color:#475569;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin:0 0 10px;";
+    personalTitle.textContent=isAdmin?"Active Capital Equipment":"Your Capital Equipment";
+    content.appendChild(personalTitle);
+
+    if(myCapital.length===0){
+      content.appendChild(el("p",{style:{color:"#334155",fontSize:"13px",marginBottom:"16px"}},"No capital equipment"));
+    } else {
+      myCapital.forEach(function(item){
+        const card=el("div",{class:"card"});
+        const ownerName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+        card.innerHTML="<div style='display:flex;justify-content:space-between;align-items:flex-start'>"
+          +"<div><div style='font-weight:700;color:#f1f5f9;font-size:14px'>"+item.name+"</div>"
+          +"<div style='color:#64748b;font-size:11px;font-family:monospace;margin-top:2px'>"+item.barcode+"</div></div>"
+          +"<span class='badge' style='background:#0ea5e918;color:#38bdf8'>CAPITAL</span></div>"
+          +"<div style='color:#64748b;font-size:11px;margin-top:6px'>"+(isAdmin?"Owner: "+ownerName:"")+"</div>";
+        content.appendChild(card);
+      });
+    }
+
+    // Facilities section
+    const facTitle=document.createElement("p");
+    facTitle.style.cssText="color:#475569;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin:16px 0 10px;border-top:1px solid #1e293b;padding-top:16px;";
+    facTitle.textContent="Facilities";
+    content.appendChild(facTitle);
+
+    if(facilities.length===0){
+      content.appendChild(el("p",{style:{color:"#334155",fontSize:"13px"}},"No facilities added yet"+(isAdmin?" — tap '+ Add Facility' above":"")));
+    } else {
+      facilities.forEach(function(facility){
+        const facItems=capitalItems.filter(i=>i.ownerId===facility.id);
+        const facCard=el("div",{class:"card"});
+        facCard.style.cssText+="border-left:3px solid #6366f1;";
+
+        const facHdr=document.createElement("div");
+        facHdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;";
+        facHdr.innerHTML="<div style='font-weight:700;color:#f1f5f9;font-size:14px'>🏥 "+facility.name+"</div>"
+          +"<span style='color:#818cf8;font-size:12px;font-weight:600'>"+facItems.length+" item"+(facItems.length!==1?"s":"")+"</span>";
+        facCard.appendChild(facHdr);
+
+        if(facItems.length===0){
+          const empty=document.createElement("p");
+          empty.style.cssText="color:#334155;font-size:12px;margin:0;";
+          empty.textContent="No capital equipment here";
+          facCard.appendChild(empty);
+        } else {
+          facItems.forEach(function(item){
+            const row=document.createElement("div");
+            row.style.cssText="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1e293b;";
+            row.innerHTML="<span style='color:#f1f5f9;font-size:13px'>"+item.name+"</span>"
+              +"<span style='color:#64748b;font-size:11px;font-family:monospace'>"+item.barcode+"</span>";
+            facCard.appendChild(row);
+          });
+        }
+
+        // Admin: delete facility button
+        if(isAdmin){
+          const delBtn=document.createElement("button");
+          delBtn.textContent="Delete Facility";
+          delBtn.style.cssText="margin-top:10px;padding:5px 10px;border-radius:6px;border:1px solid #dc262633;background:transparent;color:#f87171;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;";
+          delBtn.onclick=function(){
+            if(confirm("Delete facility '"+facility.name+"'? Items here will need to be transferred out first.")){
+              if(facItems.length>0){showToast("Move items out of this facility first","warn");return;}
+              window.fsUpdate("facilities",facility.id,{deleted:true}).then(function(){
+                setState({facilities:S.facilities.filter(f=>f.id!==facility.id)});
+                showToast("Facility deleted");
+              });
+            }
+          };
+          facCard.appendChild(delBtn);
+        }
+
+        content.appendChild(facCard);
+      });
+    }
   }
 
   // USERS (admin only)
@@ -1369,6 +1494,8 @@ function renderTransferPage(modal,owners,user){
   const isAdmin=user.role==="admin";
   const fromName=owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
   const userOwner=owners.find(o=>o.id===user.ownerId);
+  const isFacilityTransfer=modal.facilityTransfer||false;
+  const facilityName=modal.facilityName||"";
 
   // Full page takeover - no overlay, no z-index issues
   const page=document.createElement("div");
@@ -1584,7 +1711,14 @@ function renderModal(){
     const confirmBtn=document.createElement("button");
     confirmBtn.textContent="✅ Confirm — Move to Used";
     confirmBtn.style.cssText="width:100%;padding:16px;border-radius:10px;border:none;background:#f59e0b;color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;-webkit-appearance:none;";
-    confirmBtn.onclick=function(){setState({modal:null});submitCheckout(modal.item);};
+    confirmBtn.onclick=function(){
+      // Capital Equipment goes to a facility instead of Used
+      if(modal.item.type==="Capital Equipment"){
+        setState({modal:{type:"facility_checkout",item:modal.item}});
+      } else {
+        setState({modal:null});submitCheckout(modal.item);
+      }
+    };
     inner.appendChild(confirmBtn);
 
     const cancelBtn=document.createElement("button");
@@ -1756,6 +1890,129 @@ function renderModal(){
     const cancelBtn=document.createElement("button");
     cancelBtn.textContent="Cancel";
     cancelBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";
+    cancelBtn.onclick=function(){setState({modal:null});};
+    inner2.appendChild(cancelBtn);
+
+    page.appendChild(inner2);
+    return page;
+  }
+
+  if(modal.type==="add_facility"){
+    let facilityName="";
+    const div2=el("div",{class:"overlay"});
+    const inner2=el("div",{class:"overlay-inner"});
+
+    const titleRow=document.createElement("div");
+    titleRow.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";
+    const title=document.createElement("h2");
+    title.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";
+    title.textContent="Add Facility";
+    const xBtn=document.createElement("button");
+    xBtn.style.cssText="background:none;border:none;color:#475569;font-size:24px;cursor:pointer;";
+    xBtn.textContent="✕";
+    xBtn.onclick=function(){setState({modal:null});};
+    titleRow.appendChild(title);titleRow.appendChild(xBtn);
+    inner2.appendChild(titleRow);
+
+    const note=document.createElement("p");
+    note.style.cssText="color:#64748b;font-size:13px;margin-bottom:16px;";
+    note.textContent='Name will be prefixed with "Facility - " automatically';
+    inner2.appendChild(note);
+
+    const label=document.createElement("label");
+    label.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+    label.textContent="Facility Name";
+    inner2.appendChild(label);
+
+    const preview=document.createElement("div");
+    preview.style.cssText="color:#818cf8;font-size:13px;font-weight:600;margin-bottom:8px;min-height:20px;";
+    preview.textContent="";
+
+    const input=document.createElement("input");
+    input.type="text";
+    input.placeholder='e.g. OR Suite 1, Room 204';
+    input.style.cssText="width:100%;box-sizing:border-box;margin-bottom:8px;";
+    input.oninput=function(){
+      facilityName=this.value.trim();
+      preview.textContent=facilityName?"Preview: Facility - "+facilityName:"";
+    };
+    input.onkeydown=function(e){if(e.key==="Enter")saveFacility();};
+    inner2.appendChild(input);
+    inner2.appendChild(preview);
+
+    const saveBtn=document.createElement("button");
+    saveBtn.style.cssText="width:100%;padding:16px;border-radius:12px;border:none;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;margin-top:12px;margin-bottom:10px;";
+    saveBtn.textContent="✓ Add Facility";
+    saveBtn.onclick=saveFacility;
+    inner2.appendChild(saveBtn);
+
+    const cancelBtn=document.createElement("button");
+    cancelBtn.textContent="Cancel";
+    cancelBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";
+    cancelBtn.onclick=function(){setState({modal:null});};
+    inner2.appendChild(cancelBtn);
+
+    function saveFacility(){
+      if(!facilityName){showToast("Enter a facility name","warn");return;}
+      const fullName="Facility - "+facilityName;
+      const id="FAC-"+Date.now();
+      addFacility({id,name:fullName}).then(function(){
+        setState({facilities:[...S.facilities,{id,name:fullName}],modal:null});
+        showToast("✅ "+fullName+" added");
+      }).catch(function(e){showToast("Failed: "+e.message,"err");});
+    }
+
+    div2.appendChild(inner2);
+    return div2;
+  }
+
+  if(modal.type==="facility_checkout"){
+    const item=modal.item;
+    const facilities=S.facilities||[];
+
+    const page=document.createElement("div");
+    page.style.cssText="position:fixed;inset:0;background:#0a0f1c;z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+    const inner2=document.createElement("div");
+    inner2.style.cssText="max-width:480px;margin:0 auto;padding:24px 20px;";
+
+    const hdr=document.createElement("div");
+    hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-top:8px;";
+    const title=document.createElement("div");
+    title.innerHTML="<div style='color:#f1f5f9;font-size:18px;font-weight:700'>Transfer Capital Equipment</div>"
+      +"<div style='color:#64748b;font-size:12px;margin-top:2px'>"+item.name+" · "+item.barcode+"</div>";
+    const xBtn=document.createElement("button");
+    xBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:18px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit;";
+    xBtn.textContent="✕";
+    xBtn.onclick=function(){setState({modal:null});};
+    hdr.appendChild(title);hdr.appendChild(xBtn);
+    inner2.appendChild(hdr);
+
+    const question=document.createElement("p");
+    question.style.cssText="color:#94a3b8;font-size:14px;margin-bottom:16px;";
+    question.textContent="Which facility are you transferring this capital equipment to?";
+    inner2.appendChild(question);
+
+    if(facilities.length===0){
+      const empty=document.createElement("p");
+      empty.style.cssText="color:#f87171;font-size:13px;text-align:center;padding:20px 0;";
+      empty.textContent="No facilities added yet. Ask admin to add a facility first.";
+      inner2.appendChild(empty);
+    } else {
+      facilities.forEach(function(facility){
+        const btn=document.createElement("button");
+        btn.style.cssText="width:100%;padding:14px 16px;border-radius:10px;border:1px solid #6366f133;background:#6366f118;color:#c084fc;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;margin-bottom:8px;text-align:left;display:flex;align-items:center;gap:10px;";
+        btn.innerHTML="<span style='font-size:18px'>🏥</span><span>"+facility.name+"</span>";
+        btn.onclick=function(){
+          setState({modal:null});
+          submitFacilityCheckout(item, facility);
+        };
+        inner2.appendChild(btn);
+      });
+    }
+
+    const cancelBtn=document.createElement("button");
+    cancelBtn.textContent="Cancel";
+    cancelBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;margin-top:8px;";
     cancelBtn.onclick=function(){setState({modal:null});};
     inner2.appendChild(cancelBtn);
 
