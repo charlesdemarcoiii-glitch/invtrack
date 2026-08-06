@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202608061907-dtf32fix -->
+<!DOCTYPE html><!-- InvTrack v202608061916-hardcoded -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1367,7 +1367,21 @@ function renderMultiDetails(){
   const ln1=el("label",{class:"label"},"Item Name");
   const sn1=el("select");
   sn1.appendChild(el("option",{value:""},"Select item…"));
-  ["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-32","DTFM-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].forEach(function(item){sn1.appendChild(el("option",{value:item},item));});
+  sn1.appendChild(el("option",{value:"DFX"},"DFX"));
+  sn1.appendChild(el("option",{value:"DFXM"},"DFXM"));
+  sn1.appendChild(el("option",{value:"BTFT"},"BTFT"));
+  sn1.appendChild(el("option",{value:"DTF-31"},"DTF-31"));
+  sn1.appendChild(el("option",{value:"DTF-31Q"},"DTF-31Q"));
+  sn1.appendChild(el("option",{value:"DTF-32"},"DTF-32"));
+  sn1.appendChild(el("option",{value:"DTFM-31"},"DTFM-31"));
+  sn1.appendChild(el("option",{value:"DTF-18"},"DTF-18"));
+  sn1.appendChild(el("option",{value:"DTF-40"},"DTF-40"));
+  sn1.appendChild(el("option",{value:"DTFD-13"},"DTFD-13"));
+  sn1.appendChild(el("option",{value:"DTFD-24"},"DTFD-24"));
+  sn1.appendChild(el("option",{value:"BVNA"},"BVNA"));
+  sn1.appendChild(el("option",{value:"RF UNIT"},"RF UNIT"));
+  sn1.appendChild(el("option",{value:"IntraVu"},"IntraVu"));
+  sn1.appendChild(el("option",{value:"IntraVu Monitor"},"IntraVu Monitor"));
   sn1.onchange=function(){name=this.value;};
   inner.appendChild(ln1);inner.appendChild(sn1);inner.appendChild(el("div",{style:{height:"14px"}}));
 
@@ -1632,9 +1646,21 @@ function renderModal(){
     const i1=document.createElement("select");
     i1.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";
     const defOpt1=document.createElement("option");defOpt1.value="";defOpt1.textContent="Select item…";i1.appendChild(defOpt1);
-    ["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-32","DTFM-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].forEach(function(item){
-      const o=document.createElement("option");o.value=item;o.textContent=item;i1.appendChild(o);
-    });
+    (function(){const o=document.createElement("option");o.value="DFX";o.textContent="DFX";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="DFXM";o.textContent="DFXM";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="BTFT";o.textContent="BTFT";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="DTF-31";o.textContent="DTF-31";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="DTF-31Q";o.textContent="DTF-31Q";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="DTF-32";o.textContent="DTF-32";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="DTFM-31";o.textContent="DTFM-31";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="DTF-18";o.textContent="DTF-18";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="DTF-40";o.textContent="DTF-40";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="DTFD-13";o.textContent="DTFD-13";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="DTFD-24";o.textContent="DTFD-24";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="BVNA";o.textContent="BVNA";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="RF UNIT";o.textContent="RF UNIT";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="IntraVu";o.textContent="IntraVu";i1.appendChild(o);})();
+    (function(){const o=document.createElement("option");o.value="IntraVu Monitor";o.textContent="IntraVu Monitor";i1.appendChild(o);})();
     i1.onchange=function(){name=this.value;};
     inner.appendChild(n1);inner.appendChild(i1);
 
