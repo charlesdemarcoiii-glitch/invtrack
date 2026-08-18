@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202608182009 -->
+<!DOCTYPE html><!-- InvTrack v202608182057 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1440,7 +1440,7 @@ function renderMultiDetails(){
   ["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-32","DTFM-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].concat(S.customItemNames||[]).forEach(function(n){
     sn1.appendChild(el("option",{value:n},n));
   });
-  if(user&&user.role==="admin"){
+  if(S.user&&S.user.role==="admin"){
     sn1.appendChild(el("option",{value:"__add_new__"},"+ Add New Item Name"));
   }
   sn1.onchange=function(){
