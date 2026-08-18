@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202608181942 -->
+<!DOCTYPE html><!-- InvTrack v202608181948 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -117,7 +117,8 @@ function formatNote(note){
 
 function renderNoteHTML(note){
   if(!note) return "";
-  return note.split("\n").filter(function(l){return l.trim();}).map(function(l){return "<div style='margin:3px 0'>• "+l.trim()+"</div>";}).join("");
+  // Handle all line ending types: \r\n (Windows), \r (old Mac), \n (Unix/iPhone)
+  return note.split(/\r\n|\r|\n/).filter(function(l){return l.trim();}).map(function(l){return "<div style='margin:3px 0'>• "+l.trim()+"</div>";}).join("");
 }
 
 // ── DATE HELPER ───────────────────────────────────────────────────────────────
