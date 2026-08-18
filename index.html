@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202608061916-hardcoded -->
+<!DOCTYPE html><!-- InvTrack v202608181926 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -273,7 +273,7 @@ async function loadData(){
 
     setState({
       owners:owners.map(o=>({id:o._id||o.id,name:o.name,type:o.type})),
-      items:items.map(i=>({barcode:i._id||i.barcode,name:i.name,type:i.type,expDate:i.expDate,ownerId:i.ownerId,status:i.status||"active",addedAt:i.addedAt,usedBy:i.usedBy||""})),
+      items:items.map(i=>({barcode:i._id||i.barcode,name:i.name,type:i.type,expDate:i.expDate,ownerId:i.ownerId,status:i.status||"active",addedAt:i.addedAt,usedBy:i.usedBy||"",note:i.note||""})),
       log:log.map(l=>({ts:l.ts,action:l.action,barcode:l.barcode,itemName:l.itemName,from:l.from,to:l.to,user:l.user})).sort((a,b)=>new Date(b.ts)-new Date(a.ts)),
       users:users.map(u=>({username:u._id||u.username,role:u.role,ownerId:u.ownerId||"",viewableOwners:u.viewableOwners||[]})),
       orders:orders.map(o=>({id:o._id||o.id,name:o.name,count:o.count,createdBy:o.createdBy,createdAt:o.createdAt,status:o.status,items:o.items||""})),
@@ -337,12 +337,12 @@ async function submitUndoCheckout(item){
     .catch(e=>{console.error("Undo checkout failed:",e);showToast("Failed: "+e.message,"err");});
 }
 
-async function submitCheckin(barcode,name,type,expDate,ownerId){
+async function submitCheckin(barcode,name,type,expDate,ownerId,note){
   const now=new Date().toISOString();
   const ownerName=S.owners.find(o=>o.id===ownerId)?.name||ownerId;
   const orderRef=S.activeOrder?S.activeOrder.id:"";
   // Optimistic UI — update local state immediately
-  const newItem={barcode,name,type,expDate,ownerId,status:"active",addedAt:now,usedBy:""};
+  const newItem={barcode,name,type,expDate,ownerId,status:"active",addedAt:now,usedBy:"",note:note||""};
   setState({items:[...S.items,newItem]});
   // Write to Firestore in background
   addItem(newItem);
@@ -1077,9 +1077,17 @@ function renderApp(){
       // History button
       const histBtn=document.createElement("button");
       histBtn.textContent="📋 History";
-      histBtn.style.cssText="margin-top:8px;padding:5px 10px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;";
+      histBtn.style.cssText="margin-top:8px;padding:5px 10px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-right:6px;";
       histBtn.onclick=function(e){e.stopPropagation();setState({modal:{type:"item_history",item:item}});};
       card.appendChild(histBtn);
+      // Show note button for capital equipment
+      if(item.type==="Capital Equipment"&&item.note){
+        const noteBtn=document.createElement("button");
+        noteBtn.textContent="📝 Note";
+        noteBtn.style.cssText="margin-top:8px;padding:5px 10px;border-radius:7px;border:1px solid #6366f133;background:#6366f118;color:#818cf8;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;";
+        noteBtn.onclick=function(e){e.stopPropagation();setState({modal:{type:"view_note",item:item}});};
+        card.appendChild(noteBtn);
+      }
       content.appendChild(card);
     });
   }
@@ -1145,7 +1153,15 @@ function renderApp(){
           +"<div><div style='font-weight:700;color:#f1f5f9;font-size:14px'>"+item.name+"</div>"
           +"<div style='color:#64748b;font-size:11px;font-family:monospace;margin-top:2px'>"+item.barcode+"</div></div>"
           +"<span class='badge' style='background:#0ea5e918;color:#38bdf8'>CAPITAL</span></div>"
-          +"<div style='color:#64748b;font-size:11px;margin-top:6px'>"+(isAdmin?"Owner: "+ownerName:"")+"</div>";
+          +"<div style='color:#64748b;font-size:11px;margin-top:6px'>"+(isAdmin?"Owner: "+ownerName:"")+"</div>"
+          +(item.note?"<div style='margin-top:8px;padding:8px 10px;background:#0f172a;border-radius:8px;border-left:3px solid #6366f1;color:#94a3b8;font-size:12px;line-height:1.5'>📝 "+item.note+"</div>":"");
+        if(isAdmin){
+          const editNoteBtn=document.createElement("button");
+          editNoteBtn.textContent=item.note?"✏️ Edit Note":"+ Add Note";
+          editNoteBtn.style.cssText="margin-top:8px;padding:5px 10px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;";
+          editNoteBtn.onclick=function(e){e.stopPropagation();setState({modal:{type:"edit_note",item:item}});};
+          card.appendChild(editNoteBtn);
+        }
         content.appendChild(card);
       });
     }
@@ -1390,7 +1406,11 @@ function renderMultiDetails(){
   const sn2=el("select");
   sn2.appendChild(el("option",{value:""},"Select type…"));
   ["Disposable","Capital Equipment"].forEach(function(t){sn2.appendChild(el("option",{value:t},t));});
-  sn2.onchange=function(){type=this.value;};
+  sn2.onchange=function(){
+    type=this.value;
+    const noteSection=document.getElementById("capital-note-section");
+    if(noteSection) noteSection.style.display=type==="Capital Equipment"?"block":"none";
+  };
   inner.appendChild(ln2);inner.appendChild(sn2);inner.appendChild(el("div",{style:{height:"14px"}}));
 
   // Expiration Date
@@ -1532,7 +1552,43 @@ function renderTransferPage(modal,owners,user){
   hdr.appendChild(title);hdr.appendChild(xBtn);
   inner.appendChild(hdr);
 
-  // Item info card
+  // Facility transfer banner with note and accountability check
+  if(isFacilityTransfer){
+    const facBanner=document.createElement("div");
+    facBanner.style.cssText="background:#6366f118;border:1px solid #6366f133;border-radius:12px;padding:14px 16px;margin-bottom:14px;";
+    facBanner.innerHTML="<div style='color:#818cf8;font-size:12px;font-weight:600;margin-bottom:4px'>🏥 Transferring from Facility</div>"
+      +"<div style='color:#c084fc;font-size:14px;font-weight:700'>"+facilityName+"</div>"
+      +"<div style='color:#64748b;font-size:12px;margin-top:4px'>Do you want to transfer <strong style='color:#f1f5f9'>"+item.name+"</strong> into your inventory?</div>";
+    inner.appendChild(facBanner);
+
+    // Show note if exists
+    if(item.note){
+      const noteBox=document.createElement("div");
+      noteBox.style.cssText="background:#0f172a;border-radius:10px;border-left:3px solid #6366f1;padding:12px 14px;margin-bottom:12px;";
+      noteBox.innerHTML="<div style='color:#818cf8;font-size:11px;font-weight:600;margin-bottom:4px'>📝 ITEM NOTE</div>"
+        +"<div style='color:#e2e8f0;font-size:13px;line-height:1.5;white-space:pre-wrap'>"+item.note+"</div>";
+      inner.appendChild(noteBox);
+    }
+
+    // Accountability checkbox - only shown when item has a note
+    if(item.note){
+    const checkRow=document.createElement("div");
+    checkRow.style.cssText="display:flex;align-items:center;gap:12px;background:#431407;border:1px solid #78350f;border-radius:10px;padding:14px;margin-bottom:16px;cursor:pointer;";
+    const checkbox=document.createElement("input");
+    checkbox.type="checkbox";
+    checkbox.id="accountability-check";
+    checkbox.style.cssText="width:20px;height:20px;cursor:pointer;accent-color:#f59e0b;flex-shrink:0;";
+    const checkLabel=document.createElement("label");
+    checkLabel.htmlFor="accountability-check";
+    checkLabel.style.cssText="color:#fbbf24;font-weight:600;font-size:14px;cursor:pointer;";
+    checkLabel.textContent="Is everything accounted for?";
+    checkRow.onclick=function(e){if(e.target!==checkbox)checkbox.checked=!checkbox.checked;};
+    checkRow.appendChild(checkbox);checkRow.appendChild(checkLabel);
+    inner.appendChild(checkRow);
+    } // end if(item.note)
+  }
+
+// Item info card
   const itemCard=document.createElement("div");
   itemCard.style.cssText="background:#111827;border-radius:12px;border:1px solid #1e293b;padding:16px;margin-bottom:16px;";
   itemCard.innerHTML="<div style='color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px'>Item</div>"
@@ -1583,6 +1639,12 @@ function renderTransferPage(modal,owners,user){
     const dest=destOwnerId;
     if(!dest){showToast("Please select a destination","warn");return;}
     if(dest===item.ownerId){showToast("Item is already in this inventory","warn");return;}
+    // Block facility transfer if accountability not confirmed
+    if(isFacilityTransfer&&item.note){
+      const accountCheck=document.getElementById("accountability-check");
+      if(!accountCheck||!accountCheck.checked){showToast("Please confirm everything is accounted for","warn");return;}
+    }
+    confirmBtn.disabled=true;confirmBtn.textContent="Processing…";
     submitTransfer(item,dest);
   };
   inner.appendChild(confirmBtn);
@@ -1685,6 +1747,22 @@ function renderModal(){
     i3.oninput=function(){expDate=this.value;};
     inner.appendChild(n3);inner.appendChild(i3);
 
+    // Notes (Capital Equipment only - shows when type is selected)
+    let itemNote="";
+    const noteSection=document.createElement("div");
+    noteSection.id="capital-note-section";
+    noteSection.style.display="none"; // hidden by default, shown when Capital Equipment selected
+    const noteLabel=document.createElement("label");
+    noteLabel.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;margin-top:4px;";
+    noteLabel.textContent="Notes (Optional)";
+    const noteInput=document.createElement("textarea");
+    noteInput.placeholder="Add notes about this capital equipment (e.g. missing parts, condition, accessories)…";
+    noteInput.rows=3;
+    noteInput.style.cssText="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:14px;font-family:inherit;resize:vertical;margin-bottom:12px;";
+    noteInput.oninput=function(){itemNote=this.value;};
+    noteSection.appendChild(noteLabel);noteSection.appendChild(noteInput);
+    inner.appendChild(noteSection);
+
     // Assign To
     const n4=document.createElement("label");
     n4.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
@@ -1707,7 +1785,7 @@ function renderModal(){
       setState({loading:true});
       setState({modal:null,loading:false});
     showToast("✅ "+name+" → "+(pool?.name||"Pool"));
-    submitCheckin(modal.barcode,name,type,expDate,pool.id)
+    submitCheckin(modal.barcode,name,type,expDate,pool.id,itemNote)
         .catch(function(e){console.error("Checkin write failed:",e);});
     };
     inner.appendChild(submitBtn);
@@ -1922,6 +2000,110 @@ function renderModal(){
 
     page.appendChild(inner2);
     return page;
+  }
+
+  if(modal.type==="view_note"){
+    const item=modal.item;
+    const div2=el("div",{class:"overlay"});
+    const inner2=el("div",{class:"overlay-inner"});
+
+    const titleRow=document.createElement("div");
+    titleRow.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;";
+    const title=document.createElement("h2");
+    title.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";
+    title.textContent="📝 Item Note";
+    const xBtn=document.createElement("button");
+    xBtn.style.cssText="background:none;border:none;color:#475569;font-size:24px;cursor:pointer;";
+    xBtn.textContent="✕";
+    xBtn.onclick=function(){setState({modal:null});};
+    titleRow.appendChild(title);titleRow.appendChild(xBtn);
+    inner2.appendChild(titleRow);
+
+    const itemInfo=document.createElement("div");
+    itemInfo.style.cssText="background:#0f172a;border-radius:8px;padding:10px 14px;margin-bottom:14px;";
+    itemInfo.innerHTML="<div style='color:#f1f5f9;font-weight:700;font-size:14px'>"+item.name+"</div>"
+      +"<div style='color:#64748b;font-size:11px;font-family:monospace'>"+item.barcode+"</div>";
+    inner2.appendChild(itemInfo);
+
+    const noteBox=document.createElement("div");
+    noteBox.style.cssText="background:#0f172a;border-radius:10px;border-left:3px solid #6366f1;padding:14px 16px;color:#e2e8f0;font-size:14px;line-height:1.6;white-space:pre-wrap;margin-bottom:16px;";
+    noteBox.textContent=item.note||"No note added.";
+    inner2.appendChild(noteBox);
+
+    if(user.role==="admin"){
+      const editBtn=document.createElement("button");
+      editBtn.textContent="✏️ Edit Note";
+      editBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #6366f133;background:#6366f118;color:#818cf8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;";
+      editBtn.onclick=function(){setState({modal:{type:"edit_note",item:item}});};
+      inner2.appendChild(editBtn);
+    }
+
+    const closeBtn=document.createElement("button");
+    closeBtn.textContent="Close";
+    closeBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";
+    closeBtn.onclick=function(){setState({modal:null});};
+    inner2.appendChild(closeBtn);
+
+    div2.appendChild(inner2);
+    return div2;
+  }
+
+  if(modal.type==="edit_note"){
+    const item=modal.item;
+    let noteText=item.note||"";
+    const div2=el("div",{class:"overlay"});
+    const inner2=el("div",{class:"overlay-inner"});
+
+    const titleRow=document.createElement("div");
+    titleRow.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;";
+    const title=document.createElement("h2");
+    title.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";
+    title.textContent=(item.note?"Edit":"Add")+" Note";
+    const xBtn=document.createElement("button");
+    xBtn.style.cssText="background:none;border:none;color:#475569;font-size:24px;cursor:pointer;";
+    xBtn.textContent="✕";
+    xBtn.onclick=function(){setState({modal:null});};
+    titleRow.appendChild(title);titleRow.appendChild(xBtn);
+    inner2.appendChild(titleRow);
+
+    const itemInfo=document.createElement("div");
+    itemInfo.style.cssText="background:#0f172a;border-radius:8px;padding:10px 14px;margin-bottom:14px;";
+    itemInfo.innerHTML="<div style='color:#f1f5f9;font-weight:700;font-size:14px'>"+item.name+"</div>"
+      +"<div style='color:#64748b;font-size:11px;font-family:monospace'>"+item.barcode+"</div>";
+    inner2.appendChild(itemInfo);
+
+    const noteLabel=document.createElement("label");
+    noteLabel.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+    noteLabel.textContent="Note";
+    const noteInput=document.createElement("textarea");
+    noteInput.value=noteText;
+    noteInput.rows=4;
+    noteInput.placeholder="Add notes about this capital equipment…";
+    noteInput.style.cssText="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:14px;font-family:inherit;resize:vertical;margin-bottom:16px;";
+    noteInput.oninput=function(){noteText=this.value;};
+    inner2.appendChild(noteLabel);inner2.appendChild(noteInput);
+
+    const saveBtn=document.createElement("button");
+    saveBtn.textContent="✓ Save Note";
+    saveBtn.style.cssText="width:100%;padding:16px;border-radius:12px;border:none;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;";
+    saveBtn.onclick=function(){
+      updateItem(item.barcode,{note:noteText})
+        .then(function(){
+          const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,note:noteText}:i);
+          setState({items:updatedItems,modal:null});
+          showToast("✅ Note saved");
+        }).catch(function(e){showToast("Failed: "+e.message,"err");});
+    };
+    inner2.appendChild(saveBtn);
+
+    const cancelBtn=document.createElement("button");
+    cancelBtn.textContent="Cancel";
+    cancelBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";
+    cancelBtn.onclick=function(){setState({modal:null});};
+    inner2.appendChild(cancelBtn);
+
+    div2.appendChild(inner2);
+    return div2;
   }
 
   if(modal.type==="add_facility"){
