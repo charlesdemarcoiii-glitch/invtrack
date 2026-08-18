@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202608181926 -->
+<!DOCTYPE html><!-- InvTrack v202608181935 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -65,6 +65,12 @@
 
     window.fsUpdate = async (collectionName, docId, data) => {
       await updateDoc(doc(db, collectionName, docId), data);
+      return true;
+    };
+
+    window.fsDelete = async (collectionName, docId) => {
+      const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+      await deleteDoc(doc(db, collectionName, docId));
       return true;
     };
   </script>
@@ -1209,10 +1215,10 @@ function renderApp(){
           delBtn.onclick=function(){
             if(confirm("Delete facility '"+facility.name+"'? Items here will need to be transferred out first.")){
               if(facItems.length>0){showToast("Move items out of this facility first","warn");return;}
-              window.fsUpdate("facilities",facility.id,{deleted:true}).then(function(){
+              window.fsDelete("facilities",facility.id).then(function(){
                 setState({facilities:S.facilities.filter(f=>f.id!==facility.id)});
-                showToast("Facility deleted");
-              });
+                showToast("✅ Facility deleted");
+              }).catch(function(e){showToast("Failed: "+e.message,"err");});
             }
           };
           facCard.appendChild(delBtn);
