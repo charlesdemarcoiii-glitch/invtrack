@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202608181955 -->
+<!DOCTYPE html><!-- InvTrack v202608182009 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -148,6 +148,18 @@ async function fsWaitForReady(){
   }
 }
 
+async function getItemNames(){
+  await fsWaitForReady();
+  try{ return await window.fsGetAll("itemNames"); }
+  catch(e){ return []; }
+}
+
+async function addItemName(name){
+  const id="item-"+Date.now();
+  await window.fsSet("itemNames", id, {name:name, addedAt:new Date().toISOString()});
+  return id;
+}
+
 async function getFacilities(){
   await fsWaitForReady();
   try{ return await window.fsGetAll("facilities"); }
@@ -243,6 +255,7 @@ const S = {
   scanning:false,scanMode:null,scanHint:"",
   inventorySearch:"",
   facilities:[],
+  customItemNames:[],  // admin-added item names stored in Firestore
   modal:null,selectedOwner:null,
   showScanPrompt:false,
   // Multi-scan
@@ -273,8 +286,8 @@ function showToast(msg,type="ok"){
 async function loadData(){
   setState({loading:true});
   try{
-    const [ownersR,itemsR,logR,usersR,ordersR,facilitiesR]=await Promise.allSettled([
-      getOwners(),getItems(),getLog(),getUsers(),getOrders(),getFacilities()
+    const [ownersR,itemsR,logR,usersR,ordersR,facilitiesR,itemNamesR]=await Promise.allSettled([
+      getOwners(),getItems(),getLog(),getUsers(),getOrders(),getFacilities(),getItemNames()
     ]);
     const owners = ownersR.status==="fulfilled" ? ownersR.value : S.owners;
     const items = itemsR.status==="fulfilled" ? itemsR.value : S.items.map(i=>({_id:i.barcode,...i}));
@@ -282,6 +295,7 @@ async function loadData(){
     const users = usersR.status==="fulfilled" ? usersR.value : S.users.map(u=>({_id:u.username,...u}));
     const orders = ordersR.status==="fulfilled" ? ordersR.value : S.orders.map(o=>({_id:o.id,...o}));
     const facilities = facilitiesR&&facilitiesR.status==="fulfilled" ? facilitiesR.value : S.facilities;
+    const itemNamesData = itemNamesR&&itemNamesR.status==="fulfilled" ? itemNamesR.value : [];
 
     if(ownersR.status==="rejected")console.error("Owners load failed:",ownersR.reason);
     if(itemsR.status==="rejected")console.error("Items load failed:",itemsR.reason);
@@ -296,6 +310,7 @@ async function loadData(){
       users:users.map(u=>({username:u._id||u.username,role:u.role,ownerId:u.ownerId||"",viewableOwners:u.viewableOwners||[]})),
       orders:orders.map(o=>({id:o._id||o.id,name:o.name,count:o.count,createdBy:o.createdBy,createdAt:o.createdAt,status:o.status,items:o.items||""})),
       facilities:(facilities||[]).map(f=>({id:f._id||f.id,name:f.name})),
+      customItemNames:(itemNamesData||[]).map(n=>n.name).filter(Boolean),
       loading:false
     });
   }catch(e){console.error("Load failed:",e);showToast("Could not load data","err");setState({loading:false});}
@@ -998,7 +1013,7 @@ function renderApp(){
     const displayItems=searchTerm?baseItems.filter(i=>i.name.toLowerCase().includes(searchTerm)||i.barcode.toLowerCase().includes(searchTerm)):baseItems;
     // Show count summary per item type for selected owner
     if(displayItems.length>0){
-      const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-32","DTFM-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"];
+      const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-32","DTFM-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].concat(S.customItemNames||[]);
       const counts={};
       displayItems.forEach(function(item){
         if(itemTypes.includes(item.name)){
@@ -1074,7 +1089,7 @@ function renderApp(){
             ownerSection.appendChild(empty);
           } else {
             // Show count per item type like the main inventory summary
-            const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-32","DTFM-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"];
+            const itemTypes=["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-32","DTFM-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].concat(S.customItemNames||[]);
             const counts={};
             ownerItems.forEach(function(item){
               const key=itemTypes.includes(item.name)?item.name:item.type||"Other";
@@ -1422,22 +1437,20 @@ function renderMultiDetails(){
   const ln1=el("label",{class:"label"},"Item Name");
   const sn1=el("select");
   sn1.appendChild(el("option",{value:""},"Select item…"));
-  sn1.appendChild(el("option",{value:"DFX"},"DFX"));
-  sn1.appendChild(el("option",{value:"DFXM"},"DFXM"));
-  sn1.appendChild(el("option",{value:"BTFT"},"BTFT"));
-  sn1.appendChild(el("option",{value:"DTF-31"},"DTF-31"));
-  sn1.appendChild(el("option",{value:"DTF-31Q"},"DTF-31Q"));
-  sn1.appendChild(el("option",{value:"DTF-32"},"DTF-32"));
-  sn1.appendChild(el("option",{value:"DTFM-31"},"DTFM-31"));
-  sn1.appendChild(el("option",{value:"DTF-18"},"DTF-18"));
-  sn1.appendChild(el("option",{value:"DTF-40"},"DTF-40"));
-  sn1.appendChild(el("option",{value:"DTFD-13"},"DTFD-13"));
-  sn1.appendChild(el("option",{value:"DTFD-24"},"DTFD-24"));
-  sn1.appendChild(el("option",{value:"BVNA"},"BVNA"));
-  sn1.appendChild(el("option",{value:"RF UNIT"},"RF UNIT"));
-  sn1.appendChild(el("option",{value:"IntraVu"},"IntraVu"));
-  sn1.appendChild(el("option",{value:"IntraVu Monitor"},"IntraVu Monitor"));
-  sn1.onchange=function(){name=this.value;};
+  ["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-32","DTFM-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].concat(S.customItemNames||[]).forEach(function(n){
+    sn1.appendChild(el("option",{value:n},n));
+  });
+  if(user&&user.role==="admin"){
+    sn1.appendChild(el("option",{value:"__add_new__"},"+ Add New Item Name"));
+  }
+  sn1.onchange=function(){
+    if(this.value==="__add_new__"){
+      this.value="";
+      setState({modal:{type:"add_item_name",returnTo:"checkin",barcode:modal.barcode}});
+    } else {
+      name=this.value;
+    }
+  };
   inner.appendChild(ln1);inner.appendChild(sn1);inner.appendChild(el("div",{style:{height:"14px"}}));
 
   // Equipment Type dropdown
@@ -1747,22 +1760,20 @@ function renderModal(){
     const i1=document.createElement("select");
     i1.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;-webkit-appearance:none;";
     const defOpt1=document.createElement("option");defOpt1.value="";defOpt1.textContent="Select item…";i1.appendChild(defOpt1);
-    (function(){const o=document.createElement("option");o.value="DFX";o.textContent="DFX";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="DFXM";o.textContent="DFXM";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="BTFT";o.textContent="BTFT";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="DTF-31";o.textContent="DTF-31";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="DTF-31Q";o.textContent="DTF-31Q";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="DTF-32";o.textContent="DTF-32";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="DTFM-31";o.textContent="DTFM-31";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="DTF-18";o.textContent="DTF-18";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="DTF-40";o.textContent="DTF-40";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="DTFD-13";o.textContent="DTFD-13";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="DTFD-24";o.textContent="DTFD-24";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="BVNA";o.textContent="BVNA";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="RF UNIT";o.textContent="RF UNIT";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="IntraVu";o.textContent="IntraVu";i1.appendChild(o);})();
-    (function(){const o=document.createElement("option");o.value="IntraVu Monitor";o.textContent="IntraVu Monitor";i1.appendChild(o);})();
-    i1.onchange=function(){name=this.value;};
+    ["DFX","DFXM","BTFT","DTF-31","DTF-31Q","DTF-32","DTFM-31","DTF-18","DTF-40","DTFD-13","DTFD-24","BVNA","RF UNIT","IntraVu","IntraVu Monitor"].concat(S.customItemNames||[]).forEach(function(n){
+      const o=document.createElement("option");o.value=n;o.textContent=n;i1.appendChild(o);
+    });
+    if(S.user&&S.user.role==="admin"){
+      const addOpt=document.createElement("option");addOpt.value="__add_new__";addOpt.textContent="+ Add New Item Name";i1.appendChild(addOpt);
+    }
+    i1.onchange=function(){
+    if(this.value==="__add_new__"){
+      this.value="";
+      setState({modal:{type:"add_item_name",returnTo:"multi"}});
+    } else {
+      name=this.value;
+    }
+  };
     inner.appendChild(n1);inner.appendChild(i1);
 
     // Equipment Type
@@ -2039,6 +2050,62 @@ function renderModal(){
 
     page.appendChild(inner2);
     return page;
+  }
+
+  if(modal.type==="add_item_name"){
+    let newItemName="";
+    const div2=el("div",{class:"overlay"});
+    const inner2=el("div",{class:"overlay-inner"});
+
+    const titleRow=document.createElement("div");
+    titleRow.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";
+    const title=document.createElement("h2");
+    title.style.cssText="color:#f1f5f9;font-size:18px;font-weight:700;margin:0;";
+    title.textContent="Add New Item Name";
+    const xBtn=document.createElement("button");
+    xBtn.style.cssText="background:none;border:none;color:#475569;font-size:24px;cursor:pointer;";
+    xBtn.textContent="✕";
+    xBtn.onclick=function(){setState({modal:null});};
+    titleRow.appendChild(title);titleRow.appendChild(xBtn);
+    inner2.appendChild(titleRow);
+
+    const label=document.createElement("label");
+    label.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
+    label.textContent="Item Name";
+    inner2.appendChild(label);
+
+    const input=document.createElement("input");
+    input.type="text";
+    input.placeholder="e.g. DTF-45, New Device";
+    input.style.cssText="width:100%;box-sizing:border-box;margin-bottom:16px;";
+    input.oninput=function(){newItemName=this.value.trim();};
+    input.onkeydown=function(e){if(e.key==="Enter")saveNewItemName();};
+    inner2.appendChild(input);
+
+    const saveBtn=document.createElement("button");
+    saveBtn.textContent="✓ Add Item Name";
+    saveBtn.style.cssText="width:100%;padding:16px;border-radius:12px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:700;font-size:16px;cursor:pointer;display:block;font-family:inherit;margin-bottom:10px;";
+    saveBtn.onclick=saveNewItemName;
+    inner2.appendChild(saveBtn);
+
+    const cancelBtn=document.createElement("button");
+    cancelBtn.textContent="Cancel";
+    cancelBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";
+    cancelBtn.onclick=function(){setState({modal:null});};
+    inner2.appendChild(cancelBtn);
+
+    function saveNewItemName(){
+      if(!newItemName){showToast("Enter an item name","warn");return;}
+      if((S.customItemNames||[]).includes(newItemName)){showToast("Item name already exists","warn");return;}
+      addItemName(newItemName).then(function(){
+        const updated=[...(S.customItemNames||[]),newItemName];
+        setState({customItemNames:updated,modal:null});
+        showToast("✅ "+newItemName+" added to dropdown");
+      }).catch(function(e){showToast("Failed: "+e.message,"err");});
+    }
+
+    div2.appendChild(inner2);
+    return div2;
   }
 
   if(modal.type==="admin_checkout"){
