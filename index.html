@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202608181948 -->
+<!DOCTYPE html><!-- InvTrack v202608181955 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -322,6 +322,19 @@ async function submitFacilityCheckout(item, facility){
   updateItem(item.barcode,{ownerId:facility.id,status:"active"})
     .then(()=>addLog({ts:now,action:"FACILITY_OUT",barcode:item.barcode,itemName:item.name,from:fromName,to:facility.name,user:S.user.username}))
     .catch(e=>{console.error("Facility checkout failed:",e);showToast("Failed: "+e.message,"err");});
+}
+
+async function submitAdminCheckout(item, onBehalfOf){
+  const now=new Date().toISOString();
+  const ownerName=S.owners.find(o=>o.id===item.ownerId)?.name||item.ownerId;
+  // Optimistic UI
+  const updatedItems=S.items.map(i=>i.barcode===item.barcode?{...i,status:"used",ownerId:"USED",usedBy:onBehalfOf}:i);
+  setState({items:updatedItems});
+  showToast("📤 "+item.name+" checked out for "+onBehalfOf);
+  // Write to Firestore in background
+  updateItem(item.barcode,{ownerId:"USED",status:"used",usedBy:onBehalfOf})
+    .then(()=>addLog({ts:now,action:"CHECK_OUT",barcode:item.barcode,itemName:item.name,from:ownerName,to:"USED",user:S.user.username+" (on behalf of "+onBehalfOf+")"}))
+    .catch(e=>{console.error("Admin checkout failed:",e);showToast("Failed: "+e.message,"err");});
 }
 
 async function submitUndoCheckout(item){
@@ -1098,6 +1111,14 @@ function renderApp(){
       histBtn.style.cssText="margin-top:8px;padding:5px 10px;border-radius:7px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-right:6px;";
       histBtn.onclick=function(e){e.stopPropagation();setState({modal:{type:"item_history",item:item}});};
       card.appendChild(histBtn);
+      // Admin manual checkout button for disposable items
+      if(isAdmin&&item.type!=="Capital Equipment"){
+        const adminCoBtn=document.createElement("button");
+        adminCoBtn.textContent="📤 Check Out";
+        adminCoBtn.style.cssText="margin-top:8px;padding:5px 10px;border-radius:7px;border:1px solid #f59e0b33;background:#f59e0b18;color:#fbbf24;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-left:6px;";
+        adminCoBtn.onclick=function(e){e.stopPropagation();setState({modal:{type:"admin_checkout",item:item}});};
+        card.appendChild(adminCoBtn);
+      }
       // Show note button for capital equipment
       if(item.type==="Capital Equipment"&&item.note){
         const noteBtn=document.createElement("button");
@@ -2013,6 +2034,55 @@ function renderModal(){
     const cancelBtn=document.createElement("button");
     cancelBtn.textContent="Cancel";
     cancelBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;";
+    cancelBtn.onclick=function(){setState({modal:null});};
+    inner2.appendChild(cancelBtn);
+
+    page.appendChild(inner2);
+    return page;
+  }
+
+  if(modal.type==="admin_checkout"){
+    const item=modal.item;
+    const nonAdminUsers=S.users.filter(u=>u.role!=="admin"&&u.username);
+
+    const page=document.createElement("div");
+    page.style.cssText="position:fixed;inset:0;background:#0a0f1c;z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+    const inner2=document.createElement("div");
+    inner2.style.cssText="max-width:480px;margin:0 auto;padding:24px 20px;";
+
+    // Header
+    const hdr=document.createElement("div");
+    hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-top:8px;";
+    const title=document.createElement("div");
+    title.innerHTML="<div style='color:#f1f5f9;font-size:18px;font-weight:700'>Manual Check Out</div>"
+      +"<div style='color:#64748b;font-size:12px;margin-top:2px'>"+item.name+" · "+item.barcode+"</div>";
+    const xBtn=document.createElement("button");
+    xBtn.style.cssText="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:18px;border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit;";
+    xBtn.textContent="✕";
+    xBtn.onclick=function(){setState({modal:null});};
+    hdr.appendChild(title);hdr.appendChild(xBtn);
+    inner2.appendChild(hdr);
+
+    const subtitle=document.createElement("p");
+    subtitle.style.cssText="color:#94a3b8;font-size:14px;margin-bottom:16px;";
+    subtitle.textContent="Check out on behalf of which user?";
+    inner2.appendChild(subtitle);
+
+    nonAdminUsers.forEach(function(u){
+      const userOwner=S.owners.find(o=>o.id===u.ownerId);
+      const btn=document.createElement("button");
+      btn.style.cssText="width:100%;padding:14px 16px;border-radius:10px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;margin-bottom:8px;text-align:left;display:flex;align-items:center;gap:10px;";
+      btn.innerHTML="<span style='font-size:18px'>👤</span><div><div>"+(userOwner?userOwner.name:u.username)+"</div><div style='color:#64748b;font-size:11px'>"+u.username+"</div></div>";
+      btn.onclick=function(){
+        setState({modal:null});
+        submitAdminCheckout(item, u.username);
+      };
+      inner2.appendChild(btn);
+    });
+
+    const cancelBtn=document.createElement("button");
+    cancelBtn.textContent="Cancel";
+    cancelBtn.style.cssText="width:100%;padding:14px;border-radius:12px;border:1px solid #334155;background:transparent;color:#94a3b8;font-weight:600;font-size:15px;cursor:pointer;display:block;font-family:inherit;margin-top:8px;";
     cancelBtn.onclick=function(){setState({modal:null});};
     inner2.appendChild(cancelBtn);
 
