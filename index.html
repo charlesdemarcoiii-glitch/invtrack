@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202608181935 -->
+<!DOCTYPE html><!-- InvTrack v202608181942 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -109,6 +109,17 @@
 <div id="app"></div>
 <div id="print-area" style="display:none"></div>
 <script>
+// ── NOTE HELPER ───────────────────────────────────────────────────────────────
+function formatNote(note){
+  if(!note) return "";
+  return note.split("\n").filter(function(l){return l.trim();}).map(function(l){return "• "+l.trim();}).join("\n");
+}
+
+function renderNoteHTML(note){
+  if(!note) return "";
+  return note.split("\n").filter(function(l){return l.trim();}).map(function(l){return "<div style='margin:3px 0'>• "+l.trim()+"</div>";}).join("");
+}
+
 // ── DATE HELPER ───────────────────────────────────────────────────────────────
 function formatDate(ts){
   if(!ts) return "";
@@ -1160,7 +1171,7 @@ function renderApp(){
           +"<div style='color:#64748b;font-size:11px;font-family:monospace;margin-top:2px'>"+item.barcode+"</div></div>"
           +"<span class='badge' style='background:#0ea5e918;color:#38bdf8'>CAPITAL</span></div>"
           +"<div style='color:#64748b;font-size:11px;margin-top:6px'>"+(isAdmin?"Owner: "+ownerName:"")+"</div>"
-          +(item.note?"<div style='margin-top:8px;padding:8px 10px;background:#0f172a;border-radius:8px;border-left:3px solid #6366f1;color:#94a3b8;font-size:12px;line-height:1.5'>📝 "+item.note+"</div>":"");
+          +(item.note?"<div style='margin-top:8px;padding:8px 10px;background:#0f172a;border-radius:8px;border-left:3px solid #6366f1;color:#94a3b8;font-size:12px;line-height:1.6'>📝 "+renderNoteHTML(item.note)+"</div>":"");
         if(isAdmin){
           const editNoteBtn=document.createElement("button");
           editNoteBtn.textContent=item.note?"✏️ Edit Note":"+ Add Note";
@@ -1572,7 +1583,7 @@ function renderTransferPage(modal,owners,user){
       const noteBox=document.createElement("div");
       noteBox.style.cssText="background:#0f172a;border-radius:10px;border-left:3px solid #6366f1;padding:12px 14px;margin-bottom:12px;";
       noteBox.innerHTML="<div style='color:#818cf8;font-size:11px;font-weight:600;margin-bottom:4px'>📝 ITEM NOTE</div>"
-        +"<div style='color:#e2e8f0;font-size:13px;line-height:1.5;white-space:pre-wrap'>"+item.note+"</div>";
+        +"<div style='color:#e2e8f0;font-size:13px;line-height:1.6'>"+renderNoteHTML(item.note)+"</div>";
       inner.appendChild(noteBox);
     }
 
@@ -1762,7 +1773,7 @@ function renderModal(){
     noteLabel.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;margin-top:4px;";
     noteLabel.textContent="Notes (Optional)";
     const noteInput=document.createElement("textarea");
-    noteInput.placeholder="Add notes about this capital equipment (e.g. missing parts, condition, accessories)…";
+    noteInput.placeholder="Each line = one bullet point automatically";
     noteInput.rows=3;
     noteInput.style.cssText="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:14px;font-family:inherit;resize:vertical;margin-bottom:12px;";
     noteInput.oninput=function(){itemNote=this.value;};
@@ -2033,7 +2044,11 @@ function renderModal(){
 
     const noteBox=document.createElement("div");
     noteBox.style.cssText="background:#0f172a;border-radius:10px;border-left:3px solid #6366f1;padding:14px 16px;color:#e2e8f0;font-size:14px;line-height:1.6;white-space:pre-wrap;margin-bottom:16px;";
-    noteBox.textContent=item.note||"No note added.";
+    if(item.note){
+      noteBox.innerHTML=renderNoteHTML(item.note);
+    } else {
+      noteBox.textContent="No note added.";
+    }
     inner2.appendChild(noteBox);
 
     if(user.role==="admin"){
@@ -2084,7 +2099,7 @@ function renderModal(){
     const noteInput=document.createElement("textarea");
     noteInput.value=noteText;
     noteInput.rows=4;
-    noteInput.placeholder="Add notes about this capital equipment…";
+    noteInput.placeholder="Each line = one bullet point automatically";
     noteInput.style.cssText="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:14px;font-family:inherit;resize:vertical;margin-bottom:16px;";
     noteInput.oninput=function(){noteText=this.value;};
     inner2.appendChild(noteLabel);inner2.appendChild(noteInput);
