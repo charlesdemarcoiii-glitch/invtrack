@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- InvTrack v202608182107 -->
+<!DOCTYPE html><!-- InvTrack v202608201639 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1795,10 +1795,6 @@ function renderModal(){
     const n3=document.createElement("label");
     n3.style.cssText="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;";
     n3.textContent="Expiration Date";
-    // Update label dynamically when type changes to capital
-    sn2.addEventListener("change",function(){
-      n3.textContent=this.value==="Capital Equipment"?"Expiration Date (Optional)":"Expiration Date";
-    });
     const i3=document.createElement("input");
     i3.type="date";
     i3.style.cssText="width:100%;background:#0f172a;border:1px solid #334155;border-radius:9px;color:#f1f5f9;padding:11px 14px;font-size:15px;font-family:inherit;margin-bottom:14px;box-sizing:border-box;";
